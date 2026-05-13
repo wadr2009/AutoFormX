@@ -1,0 +1,24 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景 -->
+  <rect width="128" height="128" rx="28" fill="url(#gradient)"/>
+  
+  <!-- 魔法棒 -->
+  <path d="M78 24L24 78l16 16 54-54-16-16z" fill="white"/>
+  <path d="M24 78l16 16" stroke="white" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- 星星/魔法光点 -->
+  <circle cx="100" cy="28" r="8" fill="#fbbf24"/>
+  <circle cx="84" cy="14" r="5" fill="#fbbf24"/>
+  <circle cx="112" cy="44" r="5" fill="#fbbf24"/>
+  <circle cx="36" cy="32" r="4" fill="#fbbf24"/>
+  <circle cx="20" cy="50" r="3" fill="#fbbf24"/>
+  
+  <!-- 渐变定义 -->
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f97316"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+</svg>
+

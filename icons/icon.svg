@@ -1,0 +1,52 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景渐变 -->
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#667eea"/>
+      <stop offset="100%" stop-color="#764ba2"/>
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 圆角矩形背景 -->
+  <rect width="128" height="128" rx="28" fill="url(#gradient)"/>
+  
+  <!-- 魔法棒主体 -->
+  <g filter="url(#shadow)">
+    <!-- 主线条 -->
+    <path d="M90 20L60 50M90 20L82 28M90 20L95 15M60 50L40 70M60 50L65 55M40 70L15 95M40 70M15 95L10 100M15 95L20 90" 
+          stroke="white" 
+          stroke-width="5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"/>
+    
+    <!-- 星星装饰 -->
+    <circle cx="28" cy="45" r="3.5" fill="white"/>
+    <circle cx="48" cy="20" r="3.5" fill="white"/>
+    <circle cx="82" cy="82" r="3.5" fill="white"/>
+    
+    <!-- 额外的小星星 -->
+    <circle cx="70" cy="35" r="2" fill="white" opacity="0.8"/>
+    <circle cx="95" cy="60" r="2" fill="white" opacity="0.8"/>
+    <circle cx="35" cy="100" r="2" fill="white" opacity="0.8"/>
+  </g>
+  
+  <!-- 光芒效果 -->
+  <g opacity="0.6">
+    <line x1="28" y1="45" x2="26" y2="38" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="28" y1="45" x2="35" y2="43" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="28" y1="45" x2="23" y2="48" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+</svg>
+

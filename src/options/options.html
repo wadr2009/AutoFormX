@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoFormX - 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M20 3L14 9M20 3L18 5M20 3L21 2M14 9L10 13M14 9L15 10M10 13L3 20M10 13L8 15M3 20L2 21M3 20L5 18" 
+                    stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="5" cy="7" r="1.5" fill="currentColor"/>
+              <circle cx="9" cy="3" r="1.2" fill="currentColor"/>
+              <circle cx="17" cy="17" r="1.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="logo-text">
+            <span class="logo-name">AutoFormX</span>
+            <span class="logo-version">v1.1.0</span>
+          </div>
+        </div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <a href="#api" class="nav-item active" data-section="api">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13 7H7v6h6V7z"/>
+            <path fill-rule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clip-rule="evenodd"/>
+          </svg>
+          <span>API 配置</span>
+        </a>
+        <a href="#display" class="nav-item" data-section="display">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
+          </svg>
+          <span>界面设置</span>
+        </a>
+        <a href="#about" class="nav-item" data-section="about">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+          </svg>
+          <span>关于</span>
+        </a>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <button id="saveBtn" class="save-btn">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M17.707 4.293a1 1 0 010 1.414l-10 10a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L7 13.586l9.293-9.293a1 1 0 011.414 0z"/>
+          </svg>
+          <span>保存设置</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- API 配置 -->
+      <section id="api" class="section active">
+        <div class="section-header">
+          <h2>API 配置</h2>
+          <p>配置 AI 服务提供商的 API 信息</p>
+        </div>
+        
+        <div class="card api-switch-card">
+          <div class="api-switch-header">
+            <h3>一体化配置</h3>
+            <span class="api-switch-badge">服务商 / 密钥 / 模型</span>
+          </div>
+          <p class="api-switch-description">在一个区域内完成服务商、密钥与模型配置，布局与弹窗中的快速切换保持一致。</p>
+
+          <div class="api-switch-section">
+            <div class="form-group">
+              <label for="provider">服务商</label>
+              <select id="provider" class="form-select">
+                <option value="deepseek">DeepSeek</option>
+                <option value="openai">OpenAI</option>
+                <option value="moonshot">Moonshot (Kimi)</option>
+                <option value="zhipu">Zhipu GLM</option>
+                <option value="bailian">Bailian</option>
+                <option value="stepfun">StepFun</option>
+                <option value="minimax">MiniMax</option>
+                <option value="groq">Groq</option>
+                <option value="together">Together AI</option>
+                <option value="fireworks">Fireworks AI</option>
+                <option value="perplexity">Perplexity</option>
+                <option value="qwen">通义千问 (Qwen)</option>
+                <option value="siliconcloud">硅基流动 (SiliconCloud)</option>
+                <option value="nebius">Nebius AI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="xai">xAI (Grok)</option>
+                <option value="mistral">Mistral AI</option>
+                <option value="deepbricks">DeepBricks</option>
+                <option value="custom">自定义</option>
+              </select>
+              <p class="form-hint">内置主流供应商预设，也支持自定义 OpenAI 兼容 API。</p>
+            </div>
+
+            <div class="form-group">
+              <label for="apiBaseUrl">API 地址</label>
+              <input type="text" id="apiBaseUrl" class="form-input" placeholder="https://api.deepbricks.ai/v1">
+              <p class="form-hint">非自定义服务商将自动使用官方默认地址。</p>
+            </div>
+
+            <div class="form-group">
+              <label for="apiKey">API Key</label>
+              <div class="input-with-action">
+                <input type="password" id="apiKey" class="form-input" placeholder="请输入您的 API Key">
+                <button type="button" id="toggleApiKey" class="input-action-btn" title="显示/隐藏">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+              <p class="form-hint">密钥仅存储在本地浏览器同步配置中。</p>
+            </div>
+          </div>
+
+          <div class="api-switch-divider"></div>
+
+          <div class="api-switch-section">
+            <div class="card-header compact">
+              <h3>模型设置</h3>
+            </div>
+
+            <div class="form-group">
+              <label for="model">模型</label>
+              <div class="input-with-action">
+                <select id="model" class="form-select">
+                  <!-- 动态加载模型列表 -->
+                </select>
+                <button id="refreshModelBtn" type="button" class="input-action-btn" title="刷新模型列表">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+              <p class="form-hint">优先读取该服务商可用模型，拉取失败时可手动填写自定义模型。</p>
+            </div>
+
+            <div class="form-group" id="customModelGroup" style="display: none;">
+              <label for="customModel">自定义模型名称</label>
+              <input type="text" id="customModel" class="form-input" placeholder="输入模型名称，如：gpt-4-turbo">
+              <p class="form-hint">当选择“自定义模型...”时，需要手动填写模型名称。</p>
+            </div>
+
+            <div class="form-group">
+              <label for="temperature">创造性 (Temperature)</label>
+              <div class="range-group">
+                <input type="range" id="temperature" class="form-range" min="0" max="1" step="0.1" value="0.7">
+                <span id="temperatureValue" class="range-value">0.7</span>
+              </div>
+              <p class="form-hint">值越高，生成结果越随机；值越低，结果越稳定。</p>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="card">
+          <button id="testBtn" type="button" class="test-btn">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z" clip-rule="evenodd"/>
+            </svg>
+            <span>测试 API 连接</span>
+          </button>
+          <p class="test-hint">保存设置后，点击测试确保配置正确</p>
+        </div>
+      </section>
+
+      <!-- 界面设置 -->
+      <section id="display" class="section">
+        <div class="section-header">
+          <h2>界面设置</h2>
+          <p>自定义扩展的显示和行为</p>
+        </div>
+        
+        <div class="card">
+          <div class="toggle-group">
+            <div class="toggle-info">
+              <h4>输入框旁的AI按钮</h4>
+              <p>在每个输入框旁边显示快捷生成按钮，方便单个字段填写</p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="showFieldButtons">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-group">
+            <div class="toggle-info">
+              <h4>悬浮球按钮</h4>
+              <p>在页面右下角显示悬浮球，可一键填写整个表单</p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="showGlobalButton">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 关于 -->
+      <section id="about" class="section">
+        <div class="section-header">
+          <h2>关于</h2>
+          <p>AutoFormX 扩展信息</p>
+        </div>
+        
+        <div class="card about-card">
+          <div class="about-logo">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 3L14 9M20 3L18 5M20 3L21 2M14 9L10 13M14 9L15 10M10 13L3 20M10 13L8 15M3 20L2 21M3 20L5 18" 
+                    stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="5" cy="7" r="1.5" fill="currentColor"/>
+              <circle cx="9" cy="3" r="1.2" fill="currentColor"/>
+              <circle cx="17" cy="17" r="1.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <h3>AutoFormX</h3>
+          <p class="about-version">版本 1.1.0</p>
+          <p class="about-author">Created by <span class="author-name">Qi</span></p>
+          <p class="about-desc">智能表单填写助手，使用 AI 技术自动识别表单字段类型，生成符合业务场景的测试数据。</p>
+          
+          <div class="about-features">
+            <div class="feature-item">
+              <span class="feature-icon">🎯</span>
+              <span>智能识别字段类型</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">⚡</span>
+              <span>一键填写整个表单</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">🔒</span>
+              <span>数据本地加密存储</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">🌐</span>
+              <span>支持多家 AI 服务商</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Toast 提示 -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

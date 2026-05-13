@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoFormX</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- 头部区域 -->
+    <header class="popup-header">
+      <div class="header-logo">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 128 128" fill="none">
+            <rect width="128" height="128" rx="28" fill="url(#grad1)"/>
+            <path d="M69 22L34 70h28l-4 36 35-48H65l4-36z" fill="white"/>
+            <defs>
+              <linearGradient id="grad1" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#f97316"/>
+                <stop offset="1" stop-color="#ea580c"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>AutoFormX</h1>
+          <span class="version">v1.1.0 · by <span class="author">Qi</span></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 状态区域 -->
+    <div id="statusCard" class="status-card">
+      <div class="status-indicator"></div>
+      <div class="status-content">
+        <div class="status-title">未配置</div>
+        <div class="status-message">请先配置 API Key</div>
+        <div class="status-model" id="statusModel"></div>
+      </div>
+      <div class="status-action">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <section id="quickSwitchCard" class="quick-switch-card is-collapsed">
+      <div class="quick-switch-header">
+        <div>
+          <h2>模型快速切换</h2>
+          <p id="quickSwitchSummary" class="quick-switch-summary">使用当前配置</p>
+        </div>
+        <button id="toggleQuickSwitchBtn" class="quick-switch-toggle" type="button">展开</button>
+      </div>
+
+      <div class="quick-switch-body">
+        <div class="quick-switch-grid">
+          <div class="switch-field">
+            <label for="providerQuickSwitch">服务商</label>
+            <select id="providerQuickSwitch" class="switch-select">
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+              <option value="moonshot">Moonshot (Kimi)</option>
+              <option value="zhipu">Zhipu GLM</option>
+              <option value="bailian">Bailian</option>
+              <option value="stepfun">StepFun</option>
+              <option value="minimax">MiniMax</option>
+              <option value="groq">Groq</option>
+              <option value="together">Together AI</option>
+              <option value="fireworks">Fireworks AI</option>
+              <option value="perplexity">Perplexity</option>
+              <option value="qwen">通义千问</option>
+              <option value="siliconcloud">硅基流动</option>
+              <option value="nebius">Nebius AI</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="xai">xAI (Grok)</option>
+              <option value="mistral">Mistral AI</option>
+              <option value="deepbricks">DeepBricks</option>
+              <option value="custom">自定义</option>
+            </select>
+          </div>
+
+          <div class="switch-field">
+            <label for="modelQuickSwitch">模型</label>
+            <select id="modelQuickSwitch" class="switch-select">
+              <option value="">加载中...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="quick-switch-actions">
+          <button id="applySwitchBtn" class="quick-switch-btn" type="button">应用并记住</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 主操作区域 -->
+    <main class="popup-main">
+      <section class="prompt-panel" id="promptPanel">
+        <div class="prompt-panel-header">
+          <label for="customPromptInput">自定义 Prompt</label>
+          <div class="prompt-actions">
+            <button id="clearPromptBtn" class="prompt-secondary-btn" type="button">清空</button>
+          </div>
+        </div>
+        <textarea id="customPromptInput" class="prompt-textarea" rows="4" placeholder="例如：请以跨境电商卖家注册场景填写，公司名、联系人、地址和邮箱保持一致。"></textarea>
+        <div class="prompt-panel-footer">
+          <span id="promptStatus">默认规则</span>
+          <span id="promptCount">0/500</span>
+        </div>
+      </section>
+
+      <button id="fillFormBtn" class="main-action-btn" disabled>
+        <div class="btn-icon">
+          <svg width="24" height="24" viewBox="0 0 128 128" fill="none">
+            <path d="M69 22L34 70h28l-4 36 35-48H65l4-36z" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="btn-content">
+          <span class="btn-title">一键智能填写</span>
+          <span class="btn-subtitle">自动识别并填充表单</span>
+        </div>
+        <div class="btn-arrow">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M7 4l6 6-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </button>
+
+      <!-- 统计信息 -->
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-number" id="todayCount">0</div>
+          <div class="stat-label">今日填写</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-box">
+          <div class="stat-number" id="totalCount">0</div>
+          <div class="stat-label">累计使用</div>
+        </div>
+      </div>
+
+      <!-- 快捷提示 -->
+      <div class="tips-section">
+        <div class="tip-item">
+          <span class="tip-icon">⌘</span>
+          <span class="tip-text">快捷键: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></span>
+        </div>
+        <div class="tip-item">
+          <span class="tip-icon">AI</span>
+          <span class="tip-text">点击输入框旁的按钮单独生成</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- 底部导航 -->
+    <footer class="popup-footer">
+      <button id="settingsBtn" class="footer-btn">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 13a3 3 0 100-6 3 3 0 000 6z"/>
+          <path fill-rule="evenodd" d="M10 1a1 1 0 011 1v.6a7.05 7.05 0 012.64.95l.42-.42a1 1 0 111.42 1.42l-.42.42A7.05 7.05 0 0117.4 9H18a1 1 0 110 2h-.6a7.05 7.05 0 01-.95 2.64l.42.42a1 1 0 11-1.42 1.42l-.42-.42A7.05 7.05 0 0111 17.4V18a1 1 0 11-2 0v-.6a7.05 7.05 0 01-2.64-.95l-.42.42a1 1 0 11-1.42-1.42l.42-.42A7.05 7.05 0 012.6 11H2a1 1 0 110-2h.6a7.05 7.05 0 01.95-2.64l-.42-.42a1 1 0 111.42-1.42l.42.42A7.05 7.05 0 019 2.6V2a1 1 0 011-1zm0 4a5 5 0 100 10 5 5 0 000-10z" clip-rule="evenodd"/>
+        </svg>
+        <span>设置</span>
+      </button>
+      <button id="helpBtn" class="footer-btn">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+        </svg>
+        <span>帮助</span>
+      </button>
+      <button id="shortcutBtn" class="footer-btn">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M4 5a2 2 0 012-2h8a2 2 0 012 2v1H4V5zM4 8h12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V8zm3 2a1 1 0 100 2h1a1 1 0 100-2H7zm5 0a1 1 0 100 2h1a1 1 0 100-2h-1z"/>
+        </svg>
+        <span>快捷键</span>
+      </button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

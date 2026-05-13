@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoFormX 使用手册</title>
+  <link rel="stylesheet" href="help.css">
+</head>
+<body>
+  <div class="help-container">
+    <!-- 头部 -->
+    <header class="help-header">
+      <div class="header-content">
+        <div class="logo-section">
+          <div class="logo-icon">
+            <svg width="32" height="32" viewBox="0 0 128 128" fill="none">
+              <rect width="128" height="128" rx="28" fill="url(#grad1)"/>
+              <path d="M69 22L34 70h28l-4 36 35-48H65l4-36z" fill="white"/>
+              <defs>
+                <linearGradient id="grad1" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#f97316"/>
+                  <stop offset="1" stop-color="#ea580c"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="logo-text">
+            <h1>AutoFormX</h1>
+            <span class="tagline">AI 智能表单填写助手</span>
+          </div>
+        </div>
+        <a href="#" class="back-btn" id="backBtn">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/>
+          </svg>
+          返回
+        </a>
+      </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="help-main">
+      <!-- 快速开始 -->
+      <section class="help-section">
+        <div class="section-header">
+          <span class="section-icon">🚀</span>
+          <h2>快速开始</h2>
+        </div>
+        <div class="section-content">
+          <div class="step-list">
+            <div class="step-item">
+              <div class="step-number">1</div>
+              <div class="step-content">
+                <h4>配置 API</h4>
+                <p>右键点击扩展图标 → 选项，或点击弹窗中的"设置"按钮，进入设置页面配置你的 AI 服务商和 API Key。</p>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <h4>选择模型</h4>
+                <p>在设置页面选择要使用的 AI 模型，支持多种主流模型，如 DeepSeek、Qwen、GPT 等。</p>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-number">3</div>
+              <div class="step-content">
+                <h4>开始使用</h4>
+                <p>打开任意包含表单的网页，点击扩展图标 → "一键智能填写"，或使用快捷键即可自动填充表单。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 使用方法 -->
+      <section class="help-section">
+        <div class="section-header">
+          <span class="section-icon">📝</span>
+          <h2>使用方法</h2>
+        </div>
+        <div class="section-content">
+          <div class="feature-grid">
+            <div class="feature-card">
+              <div class="feature-icon">⚡</div>
+              <h4>一键填写</h4>
+              <p>点击扩展图标后，点击"一键智能填写"按钮，AI 会自动识别页面上的所有表单字段并填充合适的测试数据。</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">🎯</div>
+              <h4>单字段填写</h4>
+              <p>将鼠标悬停在输入框上，点击出现的闪电按钮，可单独为该字段生成数据。</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">⌨️</div>
+              <h4>快捷键</h4>
+              <p>使用 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> (Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>) 快速触发一键填写功能。</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">🔄</div>
+              <h4>重新生成</h4>
+              <p>对填充结果不满意？再次点击填写按钮，AI 会生成全新的数据。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 支持的服务商 -->
+      <section class="help-section">
+        <div class="section-header">
+          <span class="section-icon">🤖</span>
+          <h2>支持的 AI 服务商</h2>
+        </div>
+        <div class="section-content">
+          <div class="provider-list">
+            <div class="provider-item">
+              <div class="provider-name">硅基流动 (SiliconCloud)</div>
+              <div class="provider-desc">推荐！国内访问快，支持 DeepSeek、Qwen 等多种模型</div>
+              <a href="https://cloud.siliconflow.cn" target="_blank" class="provider-link">获取 API Key →</a>
+            </div>
+            <div class="provider-item">
+              <div class="provider-name">DeepSeek</div>
+              <div class="provider-desc">DeepSeek 官方 API，支持 DeepSeek-V3、DeepSeek-R1</div>
+              <a href="https://platform.deepseek.com" target="_blank" class="provider-link">获取 API Key →</a>
+            </div>
+            <div class="provider-item">
+              <div class="provider-name">通义千问 (Qwen)</div>
+              <div class="provider-desc">阿里云大模型，支持 Qwen-Max、Qwen-Plus、Qwen-Turbo</div>
+              <a href="https://dashscope.aliyun.com" target="_blank" class="provider-link">获取 API Key →</a>
+            </div>
+            <div class="provider-item">
+              <div class="provider-name">OpenAI</div>
+              <div class="provider-desc">GPT-4、GPT-3.5 等模型（需要能访问 OpenAI）</div>
+              <a href="https://platform.openai.com" target="_blank" class="provider-link">获取 API Key →</a>
+            </div>
+            <div class="provider-item">
+              <div class="provider-name">DeepBricks</div>
+              <div class="provider-desc">API 代理服务，国内可直接访问 GPT 系列模型</div>
+              <a href="https://deepbricks.ai" target="_blank" class="provider-link">获取 API Key →</a>
+            </div>
+            <div class="provider-item">
+              <div class="provider-name">自定义</div>
+              <div class="provider-desc">支持任何兼容 OpenAI 格式的 API 服务</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 支持的字段类型 -->
+      <section class="help-section">
+        <div class="section-header">
+          <span class="section-icon">📋</span>
+          <h2>支持的字段类型</h2>
+        </div>
+        <div class="section-content">
+          <div class="field-tags">
+            <span class="field-tag">姓名</span>
+            <span class="field-tag">邮箱</span>
+            <span class="field-tag">手机号</span>
+            <span class="field-tag">电话</span>
+            <span class="field-tag">地址</span>
+            <span class="field-tag">城市</span>
+            <span class="field-tag">省份</span>
+            <span class="field-tag">邮编</span>
+            <span class="field-tag">公司</span>
+            <span class="field-tag">职位</span>
+            <span class="field-tag">年龄</span>
+            <span class="field-tag">生日</span>
+            <span class="field-tag">日期</span>
+            <span class="field-tag">时间</span>
+            <span class="field-tag">网址</span>
+            <span class="field-tag">用户名</span>
+            <span class="field-tag">密码</span>
+            <span class="field-tag">身份证</span>
+            <span class="field-tag">性别</span>
+            <span class="field-tag">数字</span>
+            <span class="field-tag">价格</span>
+            <span class="field-tag">文本</span>
+            <span class="field-tag">多行文本</span>
+          </div>
+          <p class="field-note">
+            💡 AI 会根据字段标签、placeholder、name 等信息智能识别字段类型，生成符合中国用户习惯的测试数据。
+          </p>
+        </div>
+      </section>
+
+      <!-- 常见问题 -->
+      <section class="help-section">
+        <div class="section-header">
+          <span class="section-icon">❓</span>
+          <h2>常见问题</h2>
+        </div>
+        <div class="section-content">
+          <div class="faq-list">
+            <div class="faq-item">
+              <div class="faq-question">
+                <span class="q-icon">Q</span>
+                为什么点击填写后没有反应？
+              </div>
+              <div class="faq-answer">
+                <span class="a-icon">A</span>
+                <div>
+                  <p>请检查以下几点：</p>
+                  <ul>
+                    <li>确保已正确配置 API Key</li>
+                    <li>点击"测试连接"确认 API 可用</li>
+                    <li>刷新当前页面后重试</li>
+                    <li>某些页面可能不支持（如 chrome:// 页面）</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-question">
+                <span class="q-icon">Q</span>
+                生成的数据不符合预期怎么办？
+              </div>
+              <div class="faq-answer">
+                <span class="a-icon">A</span>
+                <div>
+                  <p>可以尝试：</p>
+                  <ul>
+                    <li>再次点击填写按钮重新生成</li>
+                    <li>使用单字段填写功能针对特定字段生成</li>
+                    <li>调整 Temperature 参数（设置页面），数值越高生成越随机</li>
+                    <li>尝试更换其他 AI 模型</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-question">
+                <span class="q-icon">Q</span>
+                API 调用失败怎么办？
+              </div>
+              <div class="faq-answer">
+                <span class="a-icon">A</span>
+                <div>
+                  <p>常见原因和解决方案：</p>
+                  <ul>
+                    <li><strong>API Key 错误</strong>：检查是否复制完整</li>
+                    <li><strong>余额不足</strong>：检查 API 账户余额</li>
+                    <li><strong>网络问题</strong>：检查网络连接，国外 API 可能需要代理</li>
+                    <li><strong>模型不可用</strong>：尝试更换其他模型</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-question">
+                <span class="q-icon">Q</span>
+                如何修改快捷键？
+              </div>
+              <div class="faq-answer">
+                <span class="a-icon">A</span>
+                <div>
+                  <p>在浏览器中打开 <code>chrome://extensions/shortcuts</code>，找到 AutoFormX，即可自定义快捷键。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 隐私说明 -->
+      <section class="help-section">
+        <div class="section-header">
+          <span class="section-icon">🔒</span>
+          <h2>隐私说明</h2>
+        </div>
+        <div class="section-content">
+          <div class="privacy-notice">
+            <ul>
+              <li>✅ 所有配置信息（API Key 等）仅存储在本地浏览器中</li>
+              <li>✅ 扩展不会将数据发送给 AutoFormX 自有服务器</li>
+              <li>✅ 表单字段上下文仅发送给你配置的 AI 服务商用于生成测试数据</li>
+              <li>✅ 生成的是虚构测试数据，不涉及真实个人信息</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 版本信息 -->
+      <section class="help-section version-section">
+        <div class="version-info">
+          <p>AutoFormX v1.1.0</p>
+          <p class="author">Created by <span class="author-name">Qi</span></p>
+          <p class="copyright">Made with ❤️ for developers and testers</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="help.js"></script>
+</body>
+</html>
