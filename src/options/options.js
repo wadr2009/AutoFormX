@@ -629,7 +629,14 @@ async function testConnection() {
     if (response.success) {
       showToast(`连接成功！模型: ${actualModel}`, 'success');
       modelListCache[provider].timestamp = 0;
-      updateModelList(provider);
+      // 保存当前自定义模型值，避免更新模型列表时丢失
+      const currentCustomModel = elements.customModel.value;
+      updateModelList(provider).then(() => {
+        // 恢复自定义模型值
+        if (elements.model.value === 'custom') {
+          elements.customModel.value = currentCustomModel;
+        }
+      });
     } else {
       showToast(`连接失败: ${response.error}`, 'error');
       console.error('[AutoFormX] API测试失败:', response.error);

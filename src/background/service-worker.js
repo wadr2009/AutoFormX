@@ -766,15 +766,150 @@ async function handleGenerateBatchData(data) {
 }
 
 /**
+ * 默认配置（从 .env 文件读取）
+ */
+const DEFAULT_CONFIG = {
+  provider: 'custom',
+  apiBaseUrl: 'https://api.example.com/v1',
+  apiKey: '',
+  model: 'custom',
+  customModel: 'your-custom-model-name',
+  apiKeys: {
+    deepbricks: '',
+    deepseek: '',
+    openai: '',
+    moonshot: '',
+    zhipu: '',
+    bailian: '',
+    stepfun: '',
+    minimax: '',
+    groq: '',
+    together: '',
+    fireworks: '',
+    perplexity: '',
+    qwen: '',
+    siliconcloud: '',
+    nebius: '',
+    openrouter: '',
+    xai: '',
+    mistral: '',
+    custom: ''
+  },
+  selectedModels: {},
+  customModels: {},
+  temperature: 0.7,
+  customPrompt: '',
+  showFieldButtons: true,
+  showGlobalButton: true,
+  globalButtonPosition: { bottom: '32px', right: '32px' }
+};
+
+/**
+ * 解析 .env 文件内容
+ */
+async function parseEnvFile() {
+  try {
+    const response = await fetch(chrome.runtime.getURL('.env'));
+    if (!response.ok) {
+      console.log('[AutoFormX] .env 文件不存在或无法读取，使用默认配置');
+      return DEFAULT_CONFIG;
+    }
+    
+    const content = await response.text();
+    const envConfig = parseEnvContent(content);
+    
+    console.log('[AutoFormX] 成功读取 .env 文件:', envConfig);
+    return envConfig;
+  } catch (error) {
+    console.log('[AutoFormX] 读取 .env 文件失败，使用默认配置:', error.message);
+    return DEFAULT_CONFIG;
+  }
+}
+
+/**
+ * 解析 .env 内容字符串
+ */
+function parseEnvContent(content) {
+  const config = { ...DEFAULT_CONFIG };
+  const lines = content.split('\n');
+  
+  for (const line of lines) {
+    // 跳过注释和空行
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    
+    const [key, value] = trimmed.split('=').map(s => s.trim());
+    if (!key || value === undefined) continue;
+    
+    // 根据键名设置对应配置
+    switch (key.toUpperCase()) {
+      case 'PROVIDER':
+        config.provider = value;
+        break;
+      case 'API_BASE_URL':
+        config.apiBaseUrl = value;
+        break;
+      case 'API_KEY':
+        config.apiKey = value;
+        config.apiKeys.custom = value;
+        break;
+      case 'CUSTOM_MODEL':
+        config.customModel = value;
+        config.customModels.custom = value;
+        break;
+    }
+  }
+  
+  return config;
+}
+
+/**
  * 扩展安装或更新时的处理
  */
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     console.log('[AutoFormX] 扩展已安装');
+    
+    // 读取 .env 文件配置
+    const envConfig = await parseEnvFile();
+    
+    // 设置默认配置
+    chrome.storage.sync.get(['provider', 'apiKey'], (items) => {
+      // 如果还没有配置，则设置默认值
+      if (!items.provider || !items.apiKey) {
+        console.log('[AutoFormX] 设置默认配置（从 .env 文件读取）');
+        chrome.storage.sync.set(envConfig, () => {
+          console.log('[AutoFormX] 默认配置已设置');
+        });
+      }
+    });
+    
     // 打开设置页面
     chrome.runtime.openOptionsPage();
   } else if (details.reason === 'update') {
     console.log('[AutoFormX] 扩展已更新');
+    
+    // 读取 .env 文件配置
+    const envConfig = await parseEnvFile();
+    
+    // 更新时检查并添加新的配置项
+    chrome.storage.sync.get(null, (items) => {
+      let needsUpdate = false;
+      const updates = {};
+      
+      // 添加缺失的配置项
+      Object.keys(envConfig).forEach(key => {
+        if (!(key in items)) {
+          updates[key] = envConfig[key];
+          needsUpdate = true;
+        }
+      });
+      
+      if (needsUpdate) {
+        console.log('[AutoFormX] 更新配置添加新字段');
+        chrome.storage.sync.set(updates);
+      }
+    });
   }
 });
 

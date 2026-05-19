@@ -338,6 +338,23 @@
       return false;
     }
     
+    // 排除已有值的输入框（非空字段不处理）
+    const tagName = field.tagName.toLowerCase();
+    // 文件字段不检查是否已有值（因为文件输入的value在未选择时也是空的）
+    if ((tagName === 'input' && field.type !== 'checkbox' && field.type !== 'radio' && field.type !== 'file') || 
+        tagName === 'textarea') {
+      const currentValue = field.value && field.value.trim();
+      if (currentValue && currentValue.length > 0) {
+        console.log(`[AutoFormX] [isValidField] 跳过已有值的字段:`, {
+          tagName: tagName,
+          type: field.type,
+          id: field.id,
+          value: currentValue.substring(0, 30) + (currentValue.length > 30 ? '...' : '')
+        });
+        return false;
+      }
+    }
+    
     return true;
   }
 
@@ -613,11 +630,13 @@
    * 处理全局按钮点击
    */
   async function handleGlobalButtonClick() {
+    console.log('[AutoFormX] ===== handleGlobalButtonClick 开始 =====');
+    
     // 收集所有表单字段
     const fields = collectAllFields();
     
     if (fields.length === 0) {
-      showToast('未找到可填写的表单字段', 'warning');
+      showToast('未找到可填写的表单字段, 已经填写的字段已被跳过', 'warning');
       return;
     }
     
@@ -625,13 +644,28 @@
     globalButton.classList.add('autoformx-loading');
     
     try {
-      // 准备精简的字段信息（不发送HTML）
-      const fieldInfos = fields.map(field => buildFieldContext(field));
+      // 准备精简的字段信息（不发送HTML，排除文件上传字段）
+      const fieldInfos = fields.map((field, index) => {
+        // 文件上传字段不需要发送给AI
+        if (field.type === 'file') {
+          console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 是文件上传字段，跳过发送给AI`);
+          return null;
+        }
+        
+        console.log(`[AutoFormX] [handleGlobalButtonClick] 构建字段[${index}]上下文:`, {
+          tagName: field.tagName,
+          className: field.className,
+          id: field.id,
+          name: field.name
+        });
+        return buildFieldContext(field);
+      }).filter(info => info !== null);
       
-      console.log('[AutoFormX] 批量生成字段数量:', fieldInfos.length);
-      console.log('[AutoFormX] 发送给AI的字段信息:', fieldInfos);
+      console.log('[AutoFormX] [handleGlobalButtonClick] 批量生成字段数量:', fieldInfos.length);
+      console.log('[AutoFormX] [handleGlobalButtonClick] 发送给AI的字段信息:', JSON.stringify(fieldInfos, null, 2));
       
       // 发送消息给background script
+      console.log('[AutoFormX] [handleGlobalButtonClick] 发送消息给 background script...');
       const response = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           action: 'generateBatchData',
@@ -639,6 +673,7 @@
             fields: fieldInfos
           }
         }, (response) => {
+          console.log('[AutoFormX] [handleGlobalButtonClick] 收到 background script 响应:', response);
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));
           } else {
@@ -648,29 +683,67 @@
       });
       
       if (response.success) {
-        // 填充数据到字段
+        console.log('[AutoFormX] [handleGlobalButtonClick] AI 生成数据成功');
+        console.log('[AutoFormX] [handleGlobalButtonClick] AI 返回的数据:', JSON.stringify(response.data, null, 2));
+        
+        // 填充数据到字段 - 普通字段先处理
         let successCount = 0;
+        const customSelectFields = [];
+        
+        // 先处理普通字段
         fields.forEach((field, index) => {
-          const fieldKey = field.name || field.id || `field_${index}`;
-          if (response.data[fieldKey]) {
-            fillField(field, response.data[fieldKey]);
+          // 文件字段直接处理，不依赖AI
+          if (field.type === 'file') {
+            console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 是文件上传字段，直接处理`);
+            fillFileField(field);
             successCount++;
+            return;
+          }
+          
+          // 使用存储在元素上的字段名来匹配（保持与发送给AI时的一致性）
+          const fieldKey = field.getAttribute('data-autoformx-name') || field.name || field.id || `field_${index}`;
+          const value = response.data[fieldKey];
+          
+          if (isCustomSelectElement(field)) {
+            customSelectFields.push({ field, index });
+          } else if (value) {
+            console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] fieldKey="${fieldKey}", value=`, value);
+            fillField(field, value);
+            successCount++;
+          } else {
+            console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 没有对应的AI数据，跳过`);
           }
         });
         
+        // 依次处理自定义下拉框（避免同时打开多个下拉框互相干扰）
+        console.log(`[AutoFormX] [handleGlobalButtonClick] 开始依次处理 ${customSelectFields.length} 个自定义下拉框`);
+        for (const { field, index } of customSelectFields) {
+          console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 是自定义下拉框，正在处理...`);
+          try {
+            await fillCustomSelectRandom(field);
+            successCount++;
+            // 等待一下，确保下拉框关闭
+            await sleep(200);
+          } catch (error) {
+            console.error(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 处理失败:`, error);
+          }
+        }
+        
         showToast(`成功填写 ${successCount}/${fields.length} 个字段`, 'success');
-        console.log(`[AutoFormX] 一键填写完成: ${successCount}/${fields.length}`);
+        console.log(`[AutoFormX] [handleGlobalButtonClick] 一键填写完成: ${successCount}/${fields.length}`);
         
         // 增加统计数据
         incrementStats();
       } else {
+        console.error('[AutoFormX] [handleGlobalButtonClick] AI 生成数据失败:', response.error);
         throw new Error(response.error || '生成失败');
       }
     } catch (error) {
-      console.error('[AutoFormX] 批量生成数据失败:', error);
+      console.error('[AutoFormX] [handleGlobalButtonClick] 批量生成数据失败:', error);
       showToast(error.message || '生成失败，请检查配置', 'error');
     } finally {
       globalButton.classList.remove('autoformx-loading');
+      console.log('[AutoFormX] ===== handleGlobalButtonClick 结束 =====');
     }
   }
 
@@ -681,8 +754,26 @@
     const fields = [];
     const allFields = document.querySelectorAll('input, textarea, select');
     
-    allFields.forEach(field => {
+    console.log('[AutoFormX] ===== 开始收集表单字段 =====');
+    console.log('[AutoFormX] 原始元素数量:', allFields.length);
+    
+    allFields.forEach((field, index) => {
+      // 排除自定义下拉框内部的 input 元素
+      if (isInsideCustomSelect(field)) {
+        console.log(`[AutoFormX] [${index}] 跳过自定义下拉框内的input:`, field.className || field.tagName);
+        return;
+      }
+      
       if (isValidField(field)) {
+        console.log(`[AutoFormX] [${index}] 收集字段:`, {
+          tagName: field.tagName,
+          type: field.type,
+          id: field.id,
+          name: field.name,
+          className: field.className,
+          placeholder: field.placeholder
+        });
+        
         // 确保字段已被处理
         if (!processedFields.has(field)) {
           const detection = window.FieldDetector.detectFieldType(field);
@@ -693,7 +784,164 @@
       }
     });
     
+    // 收集自定义下拉框组件
+    const customSelects = collectCustomSelectComponents();
+    console.log(`[AutoFormX] 收集到自定义下拉框数量: ${customSelects.length}`);
+    
+    // 收集自定义上传组件（如 Ant Design Upload）
+    const customUploads = collectCustomUploadComponents();
+    console.log(`[AutoFormX] 收集到自定义上传组件数量: ${customUploads.length}`);
+    fields.push(...customUploads);
+    customSelects.forEach((select, index) => {
+      console.log(`[AutoFormX] [自定义下拉框 ${index}]:`, {
+        className: select.className,
+        id: select.id,
+        dataType: select.getAttribute('data-autoformx-type')
+      });
+    });
+    fields.push(...customSelects);
+    
+    console.log(`[AutoFormX] ===== 字段收集完成，总计: ${fields.length} 个字段 =====`);
     return fields;
+  }
+
+  /**
+   * 收集自定义上传组件（如 Ant Design Upload）
+   */
+  function collectCustomUploadComponents() {
+    console.log('[AutoFormX] ===== 开始收集自定义上传组件 =====');
+    
+    const uploadSelectors = [
+      '.ant-upload',
+      '.el-upload',
+      '.n-upload',
+      '.arco-upload'
+    ];
+    
+    const uploads = [];
+    const seen = new Set();
+    
+    uploadSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      console.log(`[AutoFormX] [collectCustomUploadComponents] 选择器 "${selector}" 找到 ${elements.length} 个元素`);
+      
+      elements.forEach(upload => {
+        if (seen.has(upload)) return;
+        seen.add(upload);
+        
+        // 查找内部的隐藏文件输入
+        const fileInput = upload.querySelector('input[type="file"]');
+        if (fileInput && !seen.has(fileInput)) {
+          seen.add(fileInput);
+          
+          // 检查是否已有文件
+          if (fileInput.files && fileInput.files.length > 0) {
+            console.log(`[AutoFormX] [collectCustomUploadComponents] 跳过已有文件的上传组件`);
+            return;
+          }
+          
+          console.log(`[AutoFormX] [collectCustomUploadComponents] 找到隐藏的文件输入`, {
+            accept: fileInput.accept,
+            multiple: fileInput.multiple
+          });
+          fileInput.setAttribute('data-autoformx-type', 'file');
+          uploads.push(fileInput);
+        }
+      });
+    });
+    
+    console.log(`[AutoFormX] ===== 自定义上传组件收集完成，总计: ${uploads.length} 个 =====`);
+    return uploads;
+  }
+
+  /**
+   * 判断元素是否在自定义下拉框内部（只检查直接父元素）
+   */
+  function isInsideCustomSelect(element) {
+    const parent = element.parentElement;
+    if (!parent) return false;
+    
+    // 检查直接父元素是否是自定义下拉框组件
+    const parentClassList = parent.classList;
+    const isParentCustomSelect = parentClassList.contains('ant-select') ||
+        parentClassList.contains('el-select') ||
+        parentClassList.contains('n-select') ||
+        parentClassList.contains('arco-select') ||
+        parentClassList.contains('t-select') ||
+        parentClassList.contains('semi-select') ||
+        parentClassList.contains('ivu-select');
+    
+    if (isParentCustomSelect) {
+      console.log(`[AutoFormX] 元素在自定义下拉框内:`, parent.className);
+      return true;
+    }
+    
+    // 特殊处理：检查是否是 ant-select-selector 内部的 search input
+    const grandParent = parent.parentElement;
+    if (grandParent && grandParent.classList.contains('ant-select-selector')) {
+      console.log(`[AutoFormX] 元素在 ant-select-selector 内:`, grandParent.className);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * 收集自定义下拉框组件
+   */
+  function collectCustomSelectComponents() {
+    console.log('[AutoFormX] ===== 开始收集自定义下拉框 =====');
+    
+    const customSelectors = [
+      '.ant-select',
+      '.el-select',
+      '.n-select',
+      '.arco-select',
+      '.t-select',
+      '.semi-select',
+      '.ivu-select'
+    ];
+    
+    const selects = [];
+    
+    // 调试：列出页面上所有可能的下拉框元素
+    console.log('[AutoFormX] [collectCustomSelectComponents] 页面上的 .ant-select 元素数量:', document.querySelectorAll('.ant-select').length);
+    console.log('[AutoFormX] [collectCustomSelectComponents] 页面上的 .el-select 元素数量:', document.querySelectorAll('.el-select').length);
+    console.log('[AutoFormX] [collectCustomSelectComponents] 页面上的 .n-select 元素数量:', document.querySelectorAll('.n-select').length);
+    
+    // 使用 Set 避免重复收集
+    const seen = new Set();
+    
+    customSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      console.log(`[AutoFormX] [collectCustomSelectComponents] 选择器 "${selector}" 找到 ${elements.length} 个元素`);
+      
+      elements.forEach(select => {
+        // 避免重复收集同一个元素
+        if (seen.has(select)) {
+          console.log(`[AutoFormX] [collectCustomSelectComponents] 跳过重复元素`);
+          return;
+        }
+        
+        // 跳过已有值的下拉框（不发送给AI）
+        if (hasSelectValue(select)) {
+          console.log(`[AutoFormX] [collectCustomSelectComponents] 跳过已有值的下拉框`);
+          return;
+        }
+        
+        seen.add(select);
+        
+        console.log(`[AutoFormX] [collectCustomSelectComponents] 自定义下拉框元素:`, {
+          className: select.className,
+          id: select.id
+        });
+        select.setAttribute('data-autoformx-type', 'select');
+        selects.push(select);
+      });
+    });
+    
+    console.log(`[AutoFormX] ===== 自定义下拉框收集完成，总计: ${selects.length} 个 =====`);
+    return selects;
   }
 
   /**
@@ -701,22 +949,61 @@
    */
   function buildFieldContext(field) {
     const fieldType = field.getAttribute('data-autoformx-type') || 'text';
-    const label = window.FieldDetector.getFieldLabel(field);
+    const isCustomSelect = isCustomSelectElement(field);
+    
+    console.log(`[AutoFormX] [buildFieldContext] 构建字段上下文:`, {
+      tagName: field.tagName,
+      type: field.type,
+      isCustomSelect: isCustomSelect,
+      className: field.className,
+      id: field.id,
+      name: field.name
+    });
+    
+    // 获取字段标签（支持自定义下拉框）
+    let label = '';
+    if (isCustomSelect) {
+      label = getCustomSelectLabel(field);
+      console.log(`[AutoFormX] [buildFieldContext] 自定义下拉框标签: "${label}"`);
+    } else {
+      label = window.FieldDetector.getFieldLabel(field);
+    }
+    
+    // 获取字段名称（支持自定义下拉框）
+    let fieldName = '';
+    let fieldId = '';
+    let placeholder = '';
+    if (isCustomSelect) {
+      const innerInput = field.querySelector('input');
+      fieldId = field.id || innerInput?.id || '';
+      fieldName = field.name || innerInput?.name || '';
+      placeholder = innerInput?.placeholder || field.getAttribute('placeholder') || '';
+    } else {
+      fieldName = field.name;
+      fieldId = field.id;
+      placeholder = field.placeholder;
+    }
+    
+    // 生成字段名称（保持一致性）
+    const generatedName = fieldName || fieldId || `custom_select_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // 将字段名存储在元素上，方便后续填充时使用
+    field.setAttribute('data-autoformx-name', generatedName);
     
     // 构建字段的约束信息
     const context = {
       type: fieldType,
-      label: label || field.name || field.id || '未知字段',
-      name: field.name,
-      id: field.id,
-      placeholder: field.placeholder,
+      label: label || fieldName || fieldId || '未知字段',
+      name: generatedName,
+      id: fieldId,
+      placeholder: placeholder,
       maxLength: field.maxLength && field.maxLength > 0 ? field.maxLength : null,
       pattern: field.pattern,
-      required: field.required,
+      required: field.hasAttribute('aria-required') ? field.getAttribute('aria-required') === 'true' : field.required,
       readonly: field.readOnly,
     };
     
-    // 对于select，添加option选项
+    // 对于原生select，添加option选项
     if (field.tagName.toLowerCase() === 'select') {
       const options = Array.from(field.options)
         .filter(opt => opt.value && opt.value !== '')
@@ -728,13 +1015,114 @@
       context.options = options;
     }
     
+    // 对于自定义下拉框，尝试获取选项
+    if (isCustomSelect) {
+      const options = getCustomSelectOptionsSync(field);
+      console.log(`[AutoFormX] [buildFieldContext] 自定义下拉框选项:`, options);
+      if (options.length > 0) {
+        context.options = options;
+      }
+    }
+    
     // 对于textarea，添加行列信息
     if (field.tagName.toLowerCase() === 'textarea') {
       context.rows = field.rows;
       context.cols = field.cols;
     }
     
+    console.log(`[AutoFormX] [buildFieldContext] 最终上下文:`, context);
     return context;
+  }
+
+  /**
+   * 判断是否为自定义下拉框元素
+   */
+  function isCustomSelectElement(element) {
+    // 如果是 input 或 textarea 元素，直接排除（避免误识别）
+    if (element.tagName.toLowerCase() === 'input' || 
+        element.tagName.toLowerCase() === 'textarea') {
+      return false;
+    }
+    
+    const classList = element.classList;
+    const result = classList.contains('ant-select') ||
+           classList.contains('el-select') ||
+           classList.contains('n-select') ||
+           classList.contains('arco-select') ||
+           classList.contains('t-select') ||
+           classList.contains('semi-select') ||
+           classList.contains('ivu-select');
+    
+    console.log(`[AutoFormX] [isCustomSelectElement] 检查元素:`, {
+      className: classList,
+      result: result
+    });
+    
+    return result;
+  }
+
+  /**
+   * 获取自定义下拉框的标签
+   */
+  function getCustomSelectLabel(selectElement) {
+    let label = '';
+    
+    const parent = selectElement.parentElement;
+    if (parent) {
+      const prevLabel = parent.previousElementSibling;
+      if (prevLabel && (prevLabel.tagName === 'LABEL' || prevLabel.classList.contains('ant-form-item-label'))) {
+        label = prevLabel.textContent?.trim() || '';
+      }
+      
+      const formItemLabel = parent.closest('.ant-form-item')?.querySelector('.ant-form-item-label');
+      if (formItemLabel) {
+        label = formItemLabel.textContent?.trim() || '';
+      }
+      
+      const elFormLabel = parent.closest('.el-form-item')?.querySelector('.el-form-item__label');
+      if (elFormLabel) {
+        label = elFormLabel.textContent?.trim() || '';
+      }
+    }
+    
+    return label;
+  }
+
+  /**
+   * 同步获取自定义下拉框的选项（不打开下拉框）
+   */
+  function getCustomSelectOptionsSync(selectElement) {
+    const options = [];
+    
+    // 尝试从DOM中直接获取选项（适用于某些组件）
+    const optionSelectors = [
+      '.ant-select-item-option',
+      '.el-select-dropdown__item',
+      '.n-base-select-option',
+      '.arco-select-option',
+      '.t-select-option',
+      '.semi-select-option',
+      '.ivu-select-item',
+      '[role="option"]'
+    ];
+    
+    for (const selector of optionSelectors) {
+      const items = Array.from(selectElement.querySelectorAll(selector));
+      if (items.length > 0) {
+        items.forEach(item => {
+          const text = item.textContent?.trim();
+          const value = item.getAttribute('data-value') || item.dataset.value || text;
+          if (text && !item.classList.contains('ant-select-item-option-disabled') &&
+              !item.classList.contains('el-select-dropdown__item--disabled') &&
+              !item.classList.contains('is-disabled')) {
+            options.push({ text, value });
+          }
+        });
+        break;
+      }
+    }
+    
+    return options.slice(0, 10);
   }
 
   /**
@@ -747,13 +1135,37 @@
     }
 
     const tagName = field.tagName.toLowerCase();
+    const isCustomSelect = isCustomSelectElement(field);
+    
+    console.log(`[AutoFormX] [fillField] 开始填充字段:`, {
+      tagName: tagName,
+      type: field.type,
+      isCustomSelect: isCustomSelect,
+      className: field.className,
+      id: field.id,
+      name: field.name,
+      value: value
+    });
     
     try {
+      // 优先处理自定义下拉框组件
+      if (isCustomSelect) {
+        console.log(`[AutoFormX] [fillField] 识别为自定义下拉框，调用 fillCustomSelectElement`);
+        fillCustomSelectElement(field, value);
+        return;
+      }
+      
+      if (field.type === 'file') {
+        console.log(`[AutoFormX] [fillField] 文件上传字段，调用 fillFileField`);
+        fillFileField(field);
+        return;
+      }
+      
       if (tagName === 'select') {
-        // 原生 select 元素
+        console.log(`[AutoFormX] [fillField] 原生 select，调用 fillNativeSelect`);
         fillNativeSelect(field, value);
       } else if (field.type === 'checkbox') {
-        // 对于checkbox，根据值判断或50%概率选中
+        console.log(`[AutoFormX] [fillField] checkbox，值: ${value}`);
         if (typeof value === 'boolean') {
           field.checked = value;
         } else if (typeof value === 'string') {
@@ -763,24 +1175,323 @@
         }
         field.dispatchEvent(new Event('change', { bubbles: true }));
       } else if (field.type === 'radio') {
-        // 对于radio，选中当前的
+        console.log(`[AutoFormX] [fillField] radio，值: ${value}`);
         field.checked = true;
         field.dispatchEvent(new Event('change', { bubbles: true }));
       } else {
-        // 检查是否是自定义下拉框组件的输入框
-        const customSelect = findCustomSelectComponent(field);
-        if (customSelect) {
-          fillCustomSelect(customSelect, field, value);
-        } else {
-          // 普通输入框：先清空，再填充
-          fillInputField(field, value);
-        }
+        console.log(`[AutoFormX] [fillField] 普通输入框，调用 fillInputField`);
+        fillInputField(field, value);
       }
       
-      console.log(`[AutoFormX] 成功填充字段: ${field.name || field.id || '未命名'} = ${value}`);
+      console.log(`[AutoFormX] [fillField] 成功填充字段: ${field.name || field.id || '未命名'} = ${value}`);
     } catch (error) {
-      console.error('[AutoFormX] 填充字段失败:', error, field);
+      console.error('[AutoFormX] [fillField] 填充字段失败:', error, field);
     }
+  }
+
+  /**
+   * 填充自定义下拉框元素
+   */
+  async function fillCustomSelectElement(selectElement, value) {
+    console.log(`[AutoFormX] [fillCustomSelectElement] ===== 开始填充自定义下拉框 =====`);
+    console.log(`[AutoFormX] [fillCustomSelectElement] 元素信息:`, {
+      className: selectElement.className,
+      id: selectElement.id,
+      name: selectElement.name
+    });
+    console.log(`[AutoFormX] [fillCustomSelectElement] 目标值: "${value}"`);
+    
+    const classList = selectElement.classList;
+    let type = 'unknown';
+    
+    if (classList.contains('ant-select')) type = 'antd';
+    else if (classList.contains('el-select')) type = 'element';
+    else if (classList.contains('n-select')) type = 'naive';
+    else if (classList.contains('arco-select')) type = 'arco';
+    else if (classList.contains('t-select')) type = 'tdesign';
+    else if (classList.contains('semi-select')) type = 'semi';
+    else if (classList.contains('ivu-select')) type = 'iview';
+    
+    console.log(`[AutoFormX] [fillCustomSelectElement] 检测到下拉框类型: ${type}`);
+    
+    try {
+      console.log(`[AutoFormX] [fillCustomSelectElement] 步骤1: 点击打开下拉框`);
+      await clickToOpenSelect(selectElement, type);
+      
+      console.log(`[AutoFormX] [fillCustomSelectElement] 等待下拉框展开...`);
+      await sleep(150);
+      
+      console.log(`[AutoFormX] [fillCustomSelectElement] 步骤2: 查找并选择选项`);
+      const clicked = await selectOptionByValue(type, value);
+      
+      if (!clicked) {
+        console.log(`[AutoFormX] [fillCustomSelectElement] 未找到匹配选项，尝试选择第一个`);
+        await selectFirstOption(type);
+      } else {
+        console.log(`[AutoFormX] [fillCustomSelectElement] 已选择匹配选项`);
+      }
+      
+      console.log(`[AutoFormX] [fillCustomSelectElement] 等待选择完成...`);
+      await sleep(100);
+      
+      console.log(`[AutoFormX] [fillCustomSelectElement] ===== 自定义下拉框填充完成 =====`);
+    } catch (error) {
+      console.error('[AutoFormX] [fillCustomSelectElement] 填充自定义下拉框失败:', error);
+      closeDropdown();
+    }
+  }
+
+  /**
+   * 检查下拉框是否已有值
+   */
+  function hasSelectValue(selectElement) {
+    const selectorElement = selectElement.querySelector('.ant-select-selector');
+    if (!selectorElement) return false;
+    
+    // 检查是否有选中项
+    const selectedItem = selectorElement.querySelector('.ant-select-selection-item');
+    if (selectedItem && selectedItem.textContent && selectedItem.textContent.trim()) {
+      return true;
+    }
+    
+    // 检查是否有占位符（未选择状态）
+    const placeholder = selectorElement.querySelector('.ant-select-selection-placeholder');
+    if (placeholder) {
+      return false;
+    }
+    
+    return false;
+  }
+
+  /**
+   * 填充文件上传字段
+   */
+  async function fillFileField(fileInput) {
+    console.log(`[AutoFormX] [fillFileField] ===== 开始处理文件上传 =====`);
+    
+    // 检查文件输入框是否已有文件
+    if (fileInput.files && fileInput.files.length > 0) {
+      console.log(`[AutoFormX] [fillFileField] 文件输入框已有 ${fileInput.files.length} 个文件，跳过`);
+      return;
+    }
+    
+    // 获取文件上传字段支持的文件类型
+    const accept = fileInput.accept || '';
+    console.log(`[AutoFormX] [fillFileField] 支持的文件类型: "${accept}"`);
+    
+    // 可用的测试文件（与 src/defult-file/ 目录中的文件对应）
+    const availableFiles = [
+      { name: '1111111.png', type: 'image/png', size: 1000 },
+      { name: '1kb.jpeg', type: 'image/jpeg', size: 1000 },
+      { name: '1kb.jpg', type: 'image/jpeg', size: 1000 },
+      { name: 'file.pdf', type: 'application/pdf', size: 1000 },
+      { name: '1111111.zip', type: 'application/zip', size: 1000 }
+    ];
+    
+    // 根据 accept 属性筛选文件
+    const matchedFiles = filterFilesByAccept(availableFiles, accept);
+    console.log(`[AutoFormX] [fillFileField] 匹配到 ${matchedFiles.length} 个文件`);
+    
+    if (matchedFiles.length === 0) {
+      console.log(`[AutoFormX] [fillFileField] 没有匹配的文件，跳过`);
+      return;
+    }
+    
+    // 随机选择一个文件
+    const randomIndex = Math.floor(Math.random() * matchedFiles.length);
+    const selectedFile = matchedFiles[randomIndex];
+    console.log(`[AutoFormX] [fillFileField] 选择文件: ${selectedFile.name}`);
+    
+    try {
+      // 下载文件并创建 File 对象
+      const file = await downloadFile(selectedFile);
+      
+      // 创建 DataTransfer 对象
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      
+      // 设置文件输入的值
+      fileInput.files = dataTransfer.files;
+      
+      // 触发 change 事件
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      console.log(`[AutoFormX] [fillFileField] 文件上传成功: ${file.name}`);
+    } catch (error) {
+      console.error('[AutoFormX] [fillFileField] 文件上传失败:', error);
+    }
+    
+    console.log(`[AutoFormX] [fillFileField] ===== 文件上传处理完成 =====`);
+  }
+
+  /**
+   * 根据 accept 属性筛选文件
+   */
+  function filterFilesByAccept(files, accept) {
+    if (!accept || accept === '*') {
+      return files;
+    }
+    
+    const acceptTypes = accept.split(',').map(t => t.trim().toLowerCase());
+    const matched = [];
+    
+    for (const file of files) {
+      const fileType = file.type.toLowerCase();
+      
+      // 检查是否匹配
+      for (const acceptType of acceptTypes) {
+        if (acceptType === fileType || 
+            acceptType.endsWith('/*') && fileType.startsWith(acceptType.replace('/*', '/')) ||
+            acceptType === '*') {
+          matched.push(file);
+          break;
+        }
+      }
+    }
+    
+    return matched;
+  }
+
+  /**
+   * 下载文件并创建 File 对象
+   */
+  async function downloadFile(fileInfo) {
+    const url = chrome.runtime.getURL(`src/defult-file/${fileInfo.name}`);
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`无法下载文件: ${fileInfo.name}`);
+    }
+    
+    const blob = await response.blob();
+    return new File([blob], fileInfo.name, { type: fileInfo.type });
+  }
+
+  /**
+   * 随机选择自定义下拉框的一个选项
+   */
+  async function fillCustomSelectRandom(selectElement) {
+    console.log(`[AutoFormX] [fillCustomSelectRandom] ===== 开始随机选择自定义下拉框 =====`);
+    console.log(`[AutoFormX] [fillCustomSelectRandom] 元素信息:`, {
+      className: selectElement.className,
+      id: selectElement.id,
+      name: selectElement.name
+    });
+    
+    // 检查下拉框是否已有值，如果有值则跳过
+    if (hasSelectValue(selectElement)) {
+      console.log(`[AutoFormX] [fillCustomSelectRandom] 下拉框已有值，跳过`);
+      return;
+    }
+    
+    const classList = selectElement.classList;
+    let type = 'unknown';
+    
+    if (classList.contains('ant-select')) type = 'antd';
+    else if (classList.contains('el-select')) type = 'element';
+    else if (classList.contains('n-select')) type = 'naive';
+    else if (classList.contains('arco-select')) type = 'arco';
+    else if (classList.contains('t-select')) type = 'tdesign';
+    else if (classList.contains('semi-select')) type = 'semi';
+    else if (classList.contains('ivu-select')) type = 'iview';
+    
+    console.log(`[AutoFormX] [fillCustomSelectRandom] 检测到下拉框类型: ${type}`);
+    
+    try {
+      console.log(`[AutoFormX] [fillCustomSelectRandom] 步骤1: 点击打开下拉框`);
+      await clickToOpenSelect(selectElement, type);
+      
+      console.log(`[AutoFormX] [fillCustomSelectRandom] 等待下拉框展开...`);
+      await sleep(150);
+      
+      console.log(`[AutoFormX] [fillCustomSelectRandom] 步骤2: 随机选择一个选项`);
+      const success = await selectRandomOption(type);
+      
+      if (success) {
+        console.log(`[AutoFormX] [fillCustomSelectRandom] 成功随机选择选项`);
+      } else {
+        console.log(`[AutoFormX] [fillCustomSelectRandom] 未找到可选选项`);
+      }
+      
+      console.log(`[AutoFormX] [fillCustomSelectRandom] 等待选择完成...`);
+      await sleep(100);
+      
+      console.log(`[AutoFormX] [fillCustomSelectRandom] ===== 随机选择完成 =====`);
+    } catch (error) {
+      console.error('[AutoFormX] [fillCustomSelectRandom] 随机选择失败:', error);
+      closeDropdown();
+    }
+  }
+
+  /**
+   * 随机选择下拉框的一个选项
+   */
+  async function selectRandomOption(type) {
+    const dropdownSelectors = [
+      '.ant-select-dropdown:not(.ant-select-dropdown-hidden)',
+      '.ant-select-dropdown',
+      '.el-select-dropdown:not([style*="display: none"])',
+      '.el-select-dropdown__wrap',
+      '.el-popper:not([style*="display: none"])',
+      '.n-select-menu',
+      '.n-base-select-menu',
+      '.arco-select-popup',
+      '.arco-select-dropdown',
+      '.t-select-dropdown',
+      '.t-select__dropdown',
+      '.semi-select-option-list',
+      '.ivu-select-dropdown',
+      '[role="listbox"]',
+      '.dropdown-menu'
+    ];
+    
+    await sleep(100);
+    
+    const dropdowns = getVisibleDropdowns(dropdownSelectors);
+    if (dropdowns.length === 0) {
+      console.warn('[AutoFormX] [selectRandomOption] 未找到下拉框');
+      return false;
+    }
+    
+    const optionSelectors = [
+      '.ant-select-item-option',
+      '.ant-select-item',
+      '.el-select-dropdown__item',
+      '.el-option',
+      '.n-base-select-option',
+      '.arco-select-option',
+      '.t-select-option',
+      '.semi-select-option',
+      '.ivu-select-item',
+      '[role="option"]',
+      'li'
+    ];
+    
+    for (const dropdown of dropdowns) {
+      const options = getOptionsFromDropdown(dropdown, optionSelectors);
+      if (options.length === 0) continue;
+      
+      const enabledOptions = options.filter(opt => 
+        !opt.classList.contains('ant-select-item-option-disabled') &&
+        !opt.classList.contains('el-select-dropdown__item--disabled') &&
+        !opt.classList.contains('is-disabled') &&
+        !opt.hasAttribute('disabled')
+      );
+      
+      console.log(`[AutoFormX] [selectRandomOption] 找到 ${enabledOptions.length} 个可用选项`);
+      
+      if (enabledOptions.length === 0) continue;
+      
+      const randomIndex = Math.floor(Math.random() * enabledOptions.length);
+      const selectedOption = enabledOptions[randomIndex];
+      
+      console.log(`[AutoFormX] [selectRandomOption] 随机选择第 ${randomIndex} 个选项: "${selectedOption.textContent?.trim()}"`);
+      
+      triggerOptionSelect(selectedOption);
+      return true;
+    }
+    
+    return false;
   }
 
   /**
@@ -944,41 +1655,67 @@
    * 点击打开自定义下拉框
    */
   async function clickToOpenSelect(element, type) {
+    console.log(`[AutoFormX] [clickToOpenSelect] 开始点击打开下拉框，类型: ${type}`);
+    console.log(`[AutoFormX] [clickToOpenSelect] 原始元素:`, {
+      className: element.className,
+      id: element.id
+    });
+    
     let clickTarget = element;
     
     // 根据不同框架找到点击目标
     switch (type) {
       case 'antd':
         clickTarget = element.querySelector('.ant-select-selector') || element;
+        console.log(`[AutoFormX] [clickToOpenSelect] Ant Design 选择器: .ant-select-selector`);
         break;
       case 'element':
-        clickTarget = element.querySelector('.el-input__wrapper') || 
+        clickTarget = element.querySelector('.el-input__wrapper') ||
                       element.querySelector('.el-input__inner') ||
-                      element.querySelector('.el-input') || 
+                      element.querySelector('.el-input') ||
                       element;
+        console.log(`[AutoFormX] [clickToOpenSelect] Element UI 选择器: .el-input__wrapper`);
         break;
       case 'naive':
         clickTarget = element.querySelector('.n-base-selection') || element;
+        console.log(`[AutoFormX] [clickToOpenSelect] Naive UI 选择器: .n-base-selection`);
         break;
       case 'arco':
         clickTarget = element.querySelector('.arco-select-view') || element;
+        console.log(`[AutoFormX] [clickToOpenSelect] Arco Design 选择器: .arco-select-view`);
         break;
       case 'tdesign':
         clickTarget = element.querySelector('.t-input__wrap') || element;
+        console.log(`[AutoFormX] [clickToOpenSelect] TDesign 选择器: .t-input__wrap`);
         break;
       case 'semi':
         clickTarget = element.querySelector('.semi-select-selection') || element;
+        console.log(`[AutoFormX] [clickToOpenSelect] Semi Design 选择器: .semi-select-selection`);
         break;
       case 'iview':
         clickTarget = element.querySelector('.ivu-select-selection') || element;
+        console.log(`[AutoFormX] [clickToOpenSelect] iView 选择器: .ivu-select-selection`);
         break;
+      default:
+        console.log(`[AutoFormX] [clickToOpenSelect] 未知类型，使用元素本身作为点击目标`);
     }
     
+    console.log(`[AutoFormX] [clickToOpenSelect] 点击目标元素:`, {
+      className: clickTarget.className,
+      tagName: clickTarget.tagName,
+      found: clickTarget !== element
+    });
+    
     // 模拟鼠标点击
+    console.log(`[AutoFormX] [clickToOpenSelect] 触发 focus 事件`);
     clickTarget.dispatchEvent(new Event('focus', { bubbles: true, cancelable: true }));
+    console.log(`[AutoFormX] [clickToOpenSelect] 触发 mousedown 事件`);
     clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    console.log(`[AutoFormX] [clickToOpenSelect] 触发 mouseup 事件`);
     clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    console.log(`[AutoFormX] [clickToOpenSelect] 触发 click 事件`);
     clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    console.log(`[AutoFormX] [clickToOpenSelect] 点击事件发送完成`);
   }
 
   /**
@@ -986,6 +1723,7 @@
    */
   async function selectOptionByValue(type, value) {
     const valueStr = String(value).toLowerCase().trim();
+    console.log(`[AutoFormX] [selectOptionByValue] 开始查找选项，类型: ${type}, 目标值: "${valueStr}"`);
     
     // 获取所有可能的下拉选项容器
     const dropdownSelectors = [
@@ -1018,8 +1756,18 @@
     await sleep(100);
     
     const dropdowns = getVisibleDropdowns(dropdownSelectors);
+    console.log(`[AutoFormX] [selectOptionByValue] 找到可见下拉框数量: ${dropdowns.length}`);
     if (dropdowns.length === 0) {
-      console.warn('[AutoFormX] 未找到下拉框');
+      console.warn('[AutoFormX] [selectOptionByValue] 未找到下拉框');
+      
+      // 列出所有下拉框用于调试
+      dropdownSelectors.forEach(selector => {
+        const count = document.querySelectorAll(selector).length;
+        if (count > 0) {
+          console.log(`[AutoFormX] [selectOptionByValue] 选择器 "${selector}" 找到 ${count} 个`);
+        }
+      });
+      
       return false;
     }
     
@@ -1040,9 +1788,15 @@
     
     for (const dropdown of dropdowns) {
       const options = getOptionsFromDropdown(dropdown, optionSelectors);
+      console.log(`[AutoFormX] [selectOptionByValue] 下拉框 ${dropdown.className} 包含 ${options.length} 个选项`);
       if (options.length === 0) continue;
       
-      console.log(`[AutoFormX] 找到 ${options.length} 个选项，尝试匹配: ${value}`);
+      console.log(`[AutoFormX] [selectOptionByValue] 找到 ${options.length} 个选项，尝试匹配: "${valueStr}"`);
+      
+      // 列出所有选项用于调试
+      options.forEach((opt, idx) => {
+        console.log(`[AutoFormX] [selectOptionByValue]   选项[${idx}]: text="${opt.textContent?.trim()}", value="${opt.getAttribute('data-value') || opt.dataset.value || ''}"`);
+      });
       
       // 查找匹配的选项
       let matchedOption = null;
@@ -1317,7 +2071,7 @@
         if (fields.length === 0) {
           sendResponse({ 
             success: false, 
-            error: '未找到可填写的表单字段' 
+            error: '未找到可填写的表单字段, 已经填写的字段已被跳过' 
           });
           return;
         }

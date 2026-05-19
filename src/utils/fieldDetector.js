@@ -33,7 +33,8 @@ const FieldDetector = {
     TEXTAREA: 'textarea',
     SELECT: 'select',
     CHECKBOX: 'checkbox',
-    RADIO: 'radio'
+    RADIO: 'radio',
+    FILE: 'file'
   },
 
   // 字段类型关键词映射（支持中英文）
@@ -106,6 +107,8 @@ const FieldDetector = {
           return { type: this.FIELD_TYPES.CHECKBOX, confidence: 1.0 };
         case 'radio':
           return { type: this.FIELD_TYPES.RADIO, confidence: 1.0 };
+        case 'file':
+          return { type: this.FIELD_TYPES.FILE, confidence: 1.0 };
       }
     }
 
