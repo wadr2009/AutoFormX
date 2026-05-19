@@ -18,7 +18,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/utils/fieldDetector.js", "src/content/content.js"],
+      "js": ["src/utils/fieldDetector.js", "src/utils/playwrightSelect.js", "src/utils/fileUploader.js", "src/content/content.js"],
       "css": ["src/content/content.css"],
       "run_at": "document_idle"
     }
@@ -43,7 +43,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", ".env", "src/defult-file/*"],
+      "resources": ["icons/*", ".env", "src/defult-file/*", "src/injected/pageSelect.js"],
       "matches": ["<all_urls>"]
     }
   ]
