@@ -72,6 +72,105 @@ select:focus ~ .autoformx-field-button {
   animation: af-spin 1s linear infinite;
 }
 
+/* ==================== 接口提取选择按钮 ==================== */
+.autoformx-capture-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(135deg, var(--af-accent) 0%, var(--af-accent-light) 100%);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.35);
+  color: white;
+  position: fixed;
+  z-index: 999999;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+}
+
+.autoformx-capture-button.visible,
+.autoformx-capture-button:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.autoformx-capture-button:hover {
+  transform: scale(1.12);
+}
+
+/* ==================== 提取结果选择面板 ==================== */
+.autoformx-extract-picker {
+  width: 300px;
+  max-height: 260px;
+  background: var(--af-dark-bg);
+  border: 1px solid var(--af-surface-light);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.autoformx-extract-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--af-surface);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--af-text);
+}
+
+.autoformx-extract-picker-close {
+  border: none;
+  background: transparent;
+  color: var(--af-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.autoformx-extract-picker-list {
+  overflow-y: auto;
+  max-height: 220px;
+}
+
+.autoformx-extract-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid var(--af-surface);
+  background: transparent;
+  color: var(--af-text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.autoformx-extract-picker-item:hover {
+  background: var(--af-surface);
+}
+
+.autoformx-extract-item-label {
+  color: var(--af-accent-light);
+  font-weight: 600;
+}
+
+.autoformx-extract-item-value {
+  color: var(--af-text-secondary);
+  word-break: break-all;
+}
+
 /* ==================== 全局悬浮球样式 ==================== */
 .autoformx-global-button {
   position: fixed !important;

@@ -36,6 +36,12 @@
           </svg>
           <span>API 配置</span>
         </a>
+        <a href="#capture" class="nav-item" data-section="capture">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" clip-rule="evenodd"/>
+          </svg>
+          <span>接口提取</span>
+        </a>
         <a href="#display" class="nav-item" data-section="display">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
@@ -175,6 +181,42 @@
         </div>
       </section>
 
+      <!-- 接口响应提取 -->
+      <section id="capture" class="section">
+        <div class="section-header">
+          <h2>接口响应提取</h2>
+          <p>监听页面接口返回，用 AI 提取字段；填表时可选择提取结果填入</p>
+        </div>
+        <div class="card">
+          <div class="toggle-group">
+            <div class="toggle-info">
+              <h4>启用接口提取</h4>
+              <p>关闭后不会注入网络监听，也不会显示「选择提取结果」按钮</p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="responseCaptureEnabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="responseCaptureDomainWhitelist">域名白名单（正则，每行一条）</label>
+            <textarea id="responseCaptureDomainWhitelist" class="form-textarea" rows="4" placeholder="example\.com&#10;.*\.mycompany\.cn&#10;localhost"></textarea>
+            <p class="form-hint">仅当当前页面 hostname 匹配白名单中任一条正则时，才会注入 fetch/XHR 监听。以 # 开头的行为注释。</p>
+            <div class="regex-test-row">
+              <input type="text" id="domainWhitelistTestInput" class="form-input regex-test-input" placeholder="输入测试域名，如 www.example.com">
+              <span id="domainWhitelistTestResult" class="regex-test-result"></span>
+            </div>
+          </div>
+          <div class="capture-rules-header">
+            <h4>捕获规则</h4>
+            <button type="button" id="addCaptureRuleBtn" class="secondary-btn">添加规则</button>
+          </div>
+          <p class="form-hint">接口 URL 匹配规则使用正则；匹配成功后按对应 Prompt 调用 AI 提取。</p>
+          <div id="captureRulesList" class="capture-rules-list"></div>
+          <button type="button" id="clearExtractedBtn" class="secondary-btn" style="margin-top: 12px;">清空已提取结果</button>
+        </div>
+      </section>
+
       <!-- 界面设置 -->
       <section id="display" class="section">
         <div class="section-header">
@@ -227,20 +269,28 @@
           <h3>AutoFormX</h3>
           <p class="about-version">版本 1.1.0</p>
           <p class="about-author">Created by <span class="author-name">Qi</span></p>
-          <p class="about-desc">智能表单填写助手，使用 AI 技术自动识别表单字段类型，生成符合业务场景的测试数据。</p>
+          <p class="about-desc">智能表单填写助手，支持 AI 自动生成测试数据和接口响应自动提取填入，提升测试效率。</p>
           
           <div class="about-features">
             <div class="feature-item">
               <span class="feature-icon">🎯</span>
-              <span>智能识别字段类型</span>
+              <span>AI 智能生成测试数据</span>
             </div>
             <div class="feature-item">
               <span class="feature-icon">⚡</span>
               <span>一键填写整个表单</span>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">🔒</span>
-              <span>数据本地加密存储</span>
+              <span class="feature-icon">🔗</span>
+              <span>接口响应自动提取填入</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">📋</span>
+              <span>自定义下拉框自动选择</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">📎</span>
+              <span>文件上传自动填充</span>
             </div>
             <div class="feature-item">
               <span class="feature-icon">🌐</span>
@@ -255,6 +305,7 @@
     <div id="toast" class="toast"></div>
   </div>
 
+  <script src="../utils/captureUtils.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

@@ -8,8 +8,8 @@
 
   // 配置
   let config = {
-    showFieldButtons: true,
-    showGlobalButton: true,
+    showFieldButtons: false,
+    showGlobalButton: false,
     globalButtonPosition: { bottom: '32px', right: '32px' }
   };
 
@@ -27,6 +27,10 @@
     
     // 加载配置
     await loadConfig();
+
+    if (window.AutoFormXResponseCapture) {
+      await window.AutoFormXResponseCapture.init();
+    }
     
     // 扫描页面中的表单字段
     scanAndProcessFields();
@@ -48,8 +52,8 @@
   async function loadConfig() {
     return new Promise((resolve) => {
       chrome.storage.sync.get({
-        showFieldButtons: true,
-        showGlobalButton: true,
+        showFieldButtons: false,
+        showGlobalButton: false,
         globalButtonPosition: { bottom: '32px', right: '32px' }
       }, (items) => {
         config = items;
@@ -245,12 +249,6 @@
         tagName === 'textarea') {
       const currentValue = field.value && field.value.trim();
       if (currentValue && currentValue.length > 0) {
-        console.log(`[AutoFormX] [isValidField] 跳过已有值的字段:`, {
-          tagName: tagName,
-          type: field.type,
-          id: field.id,
-          value: currentValue.substring(0, 30) + (currentValue.length > 30 ? '...' : '')
-        });
         return false;
       }
     }
@@ -262,8 +260,16 @@
    * 处理单个字段
    */
   function processField(field) {
+    if (window.AutoFormXResponseCapture && isTextInputField(field)) {
+      window.AutoFormXResponseCapture.addCapturePickButton(
+        field,
+        positionFieldButton,
+        observeFieldPosition
+      );
+    }
+
     if (!config.showFieldButtons) return;
-    
+
     // 检测字段类型
     const detection = window.FieldDetector.detectFieldType(field);
     
@@ -273,6 +279,17 @@
     
     // 添加AI生成按钮
     addFieldButton(field, detection);
+  }
+
+  /**
+   * 判断是否为文本输入框（用于青色按钮展示）
+   */
+  function isTextInputField(field) {
+    const tagName = field.tagName.toLowerCase();
+    if (tagName === 'textarea') return true;
+    if (tagName !== 'input') return false;
+    const type = (field.type || 'text').toLowerCase();
+    return ['text', 'email', 'url', 'tel', 'search', 'password', 'number'].includes(type);
   }
 
   /**
@@ -338,10 +355,14 @@
   /**
    * 定位字段按钮
    */
-  function positionFieldButton(field, button) {
+  function positionFieldButton(field, button, options = {}) {
     const rect = field.getBoundingClientRect();
+    if (options.offsetX !== undefined) {
+      button.dataset.offsetX = String(options.offsetX);
+    }
+    const offsetX = options.offsetX ?? parseInt(button.dataset.offsetX || '0', 10);
     button.style.position = 'fixed';
-    button.style.left = `${rect.right - 30}px`;
+    button.style.left = `${rect.right - 30 + offsetX}px`;
     button.style.top = `${rect.top + (rect.height - 26) / 2}px`;
     button.style.zIndex = '999999';
   }
@@ -534,8 +555,6 @@
    * 处理全局按钮点击
    */
   async function handleGlobalButtonClick() {
-    console.log('[AutoFormX] ===== handleGlobalButtonClick 开始 =====');
-    
     // 收集所有表单字段
     const fields = collectAllFields();
     
@@ -557,24 +576,12 @@
         
         // 自定义下拉框不需要发送给AI（直接随机选择）
         if (window.PlaywrightSelect.isSelectField(field)) {
-          console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 是下拉框，跳过发送给AI`);
           return null;
         }
         
-        console.log(`[AutoFormX] [handleGlobalButtonClick] 构建字段[${index}]上下文:`, {
-          tagName: field.tagName,
-          className: field.className,
-          id: field.id,
-          name: field.name
-        });
         return buildFieldContext(field);
       }).filter(info => info !== null);
       
-      console.log('[AutoFormX] [handleGlobalButtonClick] 批量生成字段数量:', fieldInfos.length);
-      console.log('[AutoFormX] [handleGlobalButtonClick] 发送给AI的字段信息:', JSON.stringify(fieldInfos, null, 2));
-      
-      // 发送消息给background script
-      console.log('[AutoFormX] [handleGlobalButtonClick] 发送消息给 background script...');
       const response = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           action: 'generateBatchData',
@@ -582,7 +589,6 @@
             fields: fieldInfos
           }
         }, (response) => {
-          console.log('[AutoFormX] [handleGlobalButtonClick] 收到 background script 响应:', response);
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));
           } else {
@@ -592,14 +598,10 @@
       });
       
       if (response.success) {
-        console.log('[AutoFormX] [handleGlobalButtonClick] AI 生成数据成功');
-        console.log('[AutoFormX] [handleGlobalButtonClick] AI 返回的数据:', JSON.stringify(response.data, null, 2));
-        
         // 填充数据到字段 - 普通字段先处理
         let successCount = 0;
 
         // 顺序处理所有字段（确保串行执行，避免多个下拉框同时打开）
-        console.log(`[AutoFormX] [handleGlobalButtonClick] 开始顺序处理 ${fields.length} 个字段`);
         for (const [index, field] of fields.entries()) {
           // 文件字段直接处理，不依赖AI
           if (window.FileUploader.isFileField(field)) {
@@ -615,39 +617,30 @@
           const value = response.data[fieldKey];
           
           if (window.PlaywrightSelect.isSelectField(field)) {
-            console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 是下拉框，Playwright 随机选择...`);
             try {
               if (await window.PlaywrightSelect.fillSelectRandom(field)) {
                 successCount++;
               }
               await sleep(60);
             } catch (error) {
-              console.error(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 处理失败:`, error);
+              console.error('[AutoFormX] 下拉框处理失败:', error);
             }
           } else if (value) {
-            console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] fieldKey="${fieldKey}", value=`, value);
             await fillField(field, value);
             successCount++;
-          } else {
-            console.log(`[AutoFormX] [handleGlobalButtonClick] 字段[${index}] 没有对应的AI数据，跳过`);
           }
         }
         
         showToast(`成功填写 ${successCount}/${fields.length} 个字段`, 'success');
-        console.log(`[AutoFormX] [handleGlobalButtonClick] 一键填写完成: ${successCount}/${fields.length}`);
-        
-        // 增加统计数据
         incrementStats();
       } else {
-        console.error('[AutoFormX] [handleGlobalButtonClick] AI 生成数据失败:', response.error);
         throw new Error(response.error || '生成失败');
       }
     } catch (error) {
-      console.error('[AutoFormX] [handleGlobalButtonClick] 批量生成数据失败:', error);
+      console.error('[AutoFormX] 批量生成失败:', error);
       showToast(error.message || '生成失败，请检查配置', 'error');
     } finally {
       globalButton.classList.remove('autoformx-loading');
-      console.log('[AutoFormX] ===== handleGlobalButtonClick 结束 =====');
     }
   }
 
@@ -657,9 +650,6 @@
   function collectAllFields() {
     const fields = [];
     const allFields = document.querySelectorAll('input, textarea, select');
-    
-    console.log('[AutoFormX] ===== 开始收集表单字段 =====');
-    console.log('[AutoFormX] 原始元素数量:', allFields.length);
     
     allFields.forEach((field, index) => {
       // 排除自定义下拉框内部的 input 元素
@@ -672,15 +662,6 @@
       }
       
       if (isValidField(field)) {
-        console.log(`[AutoFormX] [${index}] 收集字段:`, {
-          tagName: field.tagName,
-          type: field.type,
-          id: field.id,
-          name: field.name,
-          className: field.className,
-          placeholder: field.placeholder
-        });
-        
         // 确保字段已被处理
         if (!processedFields.has(field)) {
           const detection = window.FieldDetector.detectFieldType(field);
@@ -693,22 +674,12 @@
     
     // 收集自定义下拉框组件
     const customSelects = collectCustomSelectComponents();
-    console.log(`[AutoFormX] 收集到自定义下拉框数量: ${customSelects.length}`);
     
     // 收集自定义上传组件（如 Ant Design Upload）
     const customUploads = collectCustomUploadComponents();
-    console.log(`[AutoFormX] 收集到自定义上传组件数量: ${customUploads.length}`);
     fields.push(...customUploads);
-    customSelects.forEach((select, index) => {
-      console.log(`[AutoFormX] [自定义下拉框 ${index}]:`, {
-        className: select.className,
-        id: select.id,
-        dataType: select.getAttribute('data-autoformx-type')
-      });
-    });
     fields.push(...customSelects);
     
-    console.log(`[AutoFormX] ===== 字段收集完成，总计: ${fields.length} 个字段 =====`);
     return fields;
   }
 
@@ -716,8 +687,6 @@
    * 收集自定义上传组件（如 Ant Design Upload）
    */
   function collectCustomUploadComponents() {
-    console.log('[AutoFormX] ===== 开始收集自定义上传组件 =====');
-    
     const uploadSelectors = window.FileUploader.UPLOAD_ROOT_SELECTOR.split(',').map((s) => s.trim());
     
     const uploads = [];
@@ -725,7 +694,6 @@
     
     uploadSelectors.forEach(selector => {
       const elements = document.querySelectorAll(selector);
-      console.log(`[AutoFormX] [collectCustomUploadComponents] 选择器 "${selector}" 找到 ${elements.length} 个元素`);
       
       elements.forEach(upload => {
         if (seen.has(upload)) return;
@@ -738,21 +706,15 @@
           
           // 检查是否已有文件
           if (fileInput.files && fileInput.files.length > 0) {
-            console.log(`[AutoFormX] [collectCustomUploadComponents] 跳过已有文件的上传组件`);
             return;
           }
           
-          console.log(`[AutoFormX] [collectCustomUploadComponents] 找到隐藏的文件输入`, {
-            accept: fileInput.accept,
-            multiple: fileInput.multiple
-          });
           fileInput.setAttribute('data-autoformx-type', 'file');
           uploads.push(fileInput);
         }
       });
     });
     
-    console.log(`[AutoFormX] ===== 自定义上传组件收集完成，总计: ${uploads.length} 个 =====`);
     return uploads;
   }
 
@@ -785,20 +747,10 @@
     const fieldType = field.getAttribute('data-autoformx-type') || 'text';
     const isCustomSelect = window.PlaywrightSelect.isCustomSelect(field);
     
-    console.log(`[AutoFormX] [buildFieldContext] 构建字段上下文:`, {
-      tagName: field.tagName,
-      type: field.type,
-      isCustomSelect: isCustomSelect,
-      className: field.className,
-      id: field.id,
-      name: field.name
-    });
-    
     // 获取字段标签（支持自定义下拉框）
     let label = '';
     if (isCustomSelect) {
       label = getCustomSelectLabel(field);
-      console.log(`[AutoFormX] [buildFieldContext] 自定义下拉框标签: "${label}"`);
     } else {
       label = window.FieldDetector.getFieldLabel(field);
     }
@@ -844,7 +796,6 @@
       context.cols = field.cols;
     }
     
-    console.log(`[AutoFormX] [buildFieldContext] 最终上下文:`, context);
     return context;
   }
 
@@ -880,21 +831,10 @@
    */
   async function fillField(field, value) {
     if (!field || value === undefined || value === null) {
-      console.warn('[AutoFormX] 无效的字段或值:', field, value);
       return;
     }
 
     const tagName = field.tagName.toLowerCase();
-
-    console.log(`[AutoFormX] [fillField] 开始填充字段:`, {
-      tagName: tagName,
-      type: field.type,
-      isSelectField: window.PlaywrightSelect.isSelectField(field),
-      className: field.className,
-      id: field.id,
-      name: field.name,
-      value: value
-    });
     
     try {
       if (window.PlaywrightSelect.isSelectField(field)) {
@@ -908,7 +848,6 @@
       }
 
       if (field.type === 'checkbox') {
-        console.log(`[AutoFormX] [fillField] checkbox，值: ${value}`);
         if (typeof value === 'boolean') {
           field.checked = value;
         } else if (typeof value === 'string') {
@@ -918,17 +857,13 @@
         }
         field.dispatchEvent(new Event('change', { bubbles: true }));
       } else if (field.type === 'radio') {
-        console.log(`[AutoFormX] [fillField] radio，值: ${value}`);
         field.checked = true;
         field.dispatchEvent(new Event('change', { bubbles: true }));
       } else {
-        console.log(`[AutoFormX] [fillField] 普通输入框，调用 fillInputField`);
         fillInputField(field, value);
       }
-      
-      console.log(`[AutoFormX] [fillField] 成功填充字段: ${field.name || field.id || '未命名'} = ${value}`);
     } catch (error) {
-      console.error('[AutoFormX] [fillField] 填充字段失败:', error, field);
+      console.error('[AutoFormX] 填充字段失败:', error);
     }
   }
 
@@ -993,6 +928,9 @@
       setTimeout(() => toast.remove(), 350);
     }, 3000);
   }
+
+  window.__autoformxFillField = fillField;
+  window.__autoformxShowToast = showToast;
 
   /**
    * 监听页面DOM变化

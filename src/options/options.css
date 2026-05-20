@@ -753,3 +753,133 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==================== 接口提取设置 ==================== */
+.form-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--options-border);
+  border-radius: 10px;
+  background: var(--options-bg);
+  color: var(--options-text);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--options-primary);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.secondary-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--options-border);
+  background: var(--options-surface-light);
+  color: var(--options-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.secondary-btn:hover {
+  background: var(--options-border);
+}
+
+.capture-rules-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 8px;
+}
+
+.capture-rules-header h4 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.capture-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.capture-rule-card {
+  padding: 14px;
+  border: 1px solid var(--options-border);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.capture-rule-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.capture-rule-enable {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--options-text-secondary);
+  cursor: pointer;
+}
+
+.capture-rule-remove {
+  border: none;
+  background: transparent;
+  color: var(--options-error);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.capture-rule-card .form-group {
+  margin-bottom: 10px;
+}
+
+.capture-rule-card .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.regex-test-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.regex-test-input {
+  flex: 1;
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+  min-height: 28px;
+}
+
+.regex-test-result {
+  font-size: 12px;
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: right;
+}
+
+.regex-test-result.match {
+  color: var(--options-success);
+}
+
+.regex-test-result.no-match {
+  color: var(--options-error);
+}
+
+.regex-test-result.error {
+  color: var(--options-warning);
+}
+
+.capture-rule-url-test {
+  margin-top: 6px;
+}

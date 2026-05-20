@@ -16,10 +16,20 @@ const elements = {
   temperatureValue: document.getElementById('temperatureValue'),
   showFieldButtons: document.getElementById('showFieldButtons'),
   showGlobalButton: document.getElementById('showGlobalButton'),
+  responseCaptureEnabled: document.getElementById('responseCaptureEnabled'),
+  responseCaptureDomainWhitelist: document.getElementById('responseCaptureDomainWhitelist'),
+  captureRulesList: document.getElementById('captureRulesList'),
+  addCaptureRuleBtn: document.getElementById('addCaptureRuleBtn'),
+  clearExtractedBtn: document.getElementById('clearExtractedBtn'),
+  domainWhitelistTestInput: document.getElementById('domainWhitelistTestInput'),
+  domainWhitelistTestResult: document.getElementById('domainWhitelistTestResult'),
   saveBtn: document.getElementById('saveBtn'),
   testBtn: document.getElementById('testBtn'),
   toast: document.getElementById('toast')
 };
+
+/** @type {Array<{id:string,name:string,urlPattern:string,extractPrompt:string,enabled:boolean}>} */
+let captureRulesDraft = [];
 
 // 本地模型列表缓存（带时间戳）
 let modelListCache = {
@@ -165,8 +175,11 @@ function loadSettings() {
     model: 'gpt-4-turbo',
     customModel: '',
     temperature: 0.7,
-    showFieldButtons: true,
-    showGlobalButton: true
+    showFieldButtons: false,
+    showGlobalButton: false,
+    responseCaptureEnabled: false,
+    responseCaptureDomainWhitelist: '',
+    responseCaptureRules: []
   }, (items) => {
     elements.provider.value = items.provider;
     elements.apiBaseUrl.value = items.apiBaseUrl;
@@ -179,6 +192,11 @@ function loadSettings() {
     elements.temperatureValue.textContent = items.temperature;
     elements.showFieldButtons.checked = items.showFieldButtons;
     elements.showGlobalButton.checked = items.showGlobalButton;
+    elements.responseCaptureEnabled.checked = items.responseCaptureEnabled;
+    elements.responseCaptureDomainWhitelist.value = items.responseCaptureDomainWhitelist || '';
+    captureRulesDraft = Array.isArray(items.responseCaptureRules) ? items.responseCaptureRules : [];
+    renderCaptureRules();
+    updateDomainWhitelistTest();
 
     // 存储全局配置供后续使用
     window.currentSettings = items;
@@ -247,6 +265,37 @@ function bindEvents() {
   }
 
   // 刷新模型列表按钮
+  if (elements.addCaptureRuleBtn) {
+    elements.addCaptureRuleBtn.addEventListener('click', () => {
+      captureRulesDraft.push({
+        id: `rule_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: `规则 ${captureRulesDraft.length + 1}`,
+        urlPattern: '',
+        extractPrompt: '',
+        enabled: true
+      });
+      renderCaptureRules();
+    });
+  }
+
+  if (elements.clearExtractedBtn) {
+    elements.clearExtractedBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'clearExtractedResults' }, (response) => {
+        if (response?.success) {
+          showToast('已清空提取结果', 'success');
+        }
+      });
+    });
+  }
+
+  if (elements.responseCaptureDomainWhitelist) {
+    elements.responseCaptureDomainWhitelist.addEventListener('input', updateDomainWhitelistTest);
+  }
+
+  if (elements.domainWhitelistTestInput) {
+    elements.domainWhitelistTestInput.addEventListener('input', updateDomainWhitelistTest);
+  }
+
   if (elements.refreshModelBtn) {
     elements.refreshModelBtn.addEventListener('click', async () => {
       const provider = elements.provider.value;
@@ -559,7 +608,10 @@ function saveSettings() {
       customModels: customModels,
       temperature: parseFloat(elements.temperature.value),
       showFieldButtons: elements.showFieldButtons.checked,
-      showGlobalButton: elements.showGlobalButton.checked
+      showGlobalButton: elements.showGlobalButton.checked,
+      responseCaptureEnabled: elements.responseCaptureEnabled.checked,
+      responseCaptureDomainWhitelist: elements.responseCaptureDomainWhitelist.value.trim(),
+      responseCaptureRules: captureRulesDraft
     };
 
     chrome.storage.sync.set(settings, () => {
@@ -647,6 +699,140 @@ async function testConnection() {
   } finally {
     elements.testBtn.disabled = false;
     elements.testBtn.innerHTML = originalContent;
+  }
+}
+
+function createRuleId() {
+  return `rule_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function renderCaptureRules() {
+  if (!elements.captureRulesList) return;
+  elements.captureRulesList.innerHTML = '';
+
+  if (captureRulesDraft.length === 0) {
+    elements.captureRulesList.innerHTML = '<p class="form-hint">暂无规则，点击「添加规则」创建。</p>';
+    return;
+  }
+
+  captureRulesDraft.forEach((rule, index) => {
+    const card = document.createElement('div');
+    card.className = 'capture-rule-card';
+    card.innerHTML = `
+      <div class="capture-rule-card-header">
+        <label class="capture-rule-enable">
+          <input type="checkbox" data-field="enabled" ${rule.enabled !== false ? 'checked' : ''}>
+          <span>启用</span>
+        </label>
+        <button type="button" class="capture-rule-remove" data-action="remove" title="删除">删除</button>
+      </div>
+      <div class="form-group">
+        <label>规则名称</label>
+        <input type="text" class="form-input" data-field="name" value="" placeholder="如：订单详情接口">
+      </div>
+      <div class="form-group">
+        <label>接口 URL 正则</label>
+        <input type="text" class="form-input" data-field="urlPattern" value="" placeholder=".*/api/order/.*">
+        <div class="regex-test-row capture-rule-url-test">
+          <input type="text" class="form-input regex-test-input" data-field="urlTestInput" placeholder="输入测试 URL 进行匹配">
+          <span class="regex-test-result" data-field="urlTestResult"></span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>AI 提取 Prompt</label>
+        <textarea class="form-textarea" data-field="extractPrompt" rows="3" placeholder="提取 orderNo、customerName、amount，返回 JSON"></textarea>
+      </div>
+    `;
+
+    card.querySelector('[data-field="name"]').value = rule.name || '';
+    card.querySelector('[data-field="urlPattern"]').value = rule.urlPattern || '';
+    card.querySelector('[data-field="extractPrompt"]').value = rule.extractPrompt || '';
+
+    card.querySelector('[data-field="enabled"]').addEventListener('change', (e) => {
+      captureRulesDraft[index].enabled = e.target.checked;
+    });
+    card.querySelector('[data-field="name"]').addEventListener('input', (e) => {
+      captureRulesDraft[index].name = e.target.value;
+    });
+    card.querySelector('[data-field="urlPattern"]').addEventListener('input', (e) => {
+      captureRulesDraft[index].urlPattern = e.target.value;
+      updateUrlPatternTest(card, e.target.value, card.querySelector('[data-field="urlTestInput"]')?.value || '');
+    });
+    card.querySelector('[data-field="extractPrompt"]').addEventListener('input', (e) => {
+      captureRulesDraft[index].extractPrompt = e.target.value;
+    });
+    card.querySelector('[data-action="remove"]').addEventListener('click', () => {
+      captureRulesDraft.splice(index, 1);
+      renderCaptureRules();
+    });
+
+    const urlTestInput = card.querySelector('[data-field="urlTestInput"]');
+    if (urlTestInput) {
+      urlTestInput.addEventListener('input', (e) => {
+        const urlPattern = card.querySelector('[data-field="urlPattern"]')?.value || '';
+        updateUrlPatternTest(card, urlPattern, e.target.value);
+      });
+    }
+
+    elements.captureRulesList.appendChild(card);
+  });
+}
+
+function updateUrlPatternTest(card, pattern, testUrl) {
+  const resultEl = card.querySelector('[data-field="urlTestResult"]');
+  if (!resultEl) return;
+  if (!testUrl.trim()) {
+    resultEl.textContent = '';
+    resultEl.className = 'regex-test-result';
+    return;
+  }
+  if (!pattern.trim()) {
+    resultEl.textContent = '请输入正则';
+    resultEl.className = 'regex-test-result error';
+    return;
+  }
+  const utils = window.AutoFormXCaptureUtils;
+  const regex = utils ? utils.compilePattern(pattern) : (() => { try { return new RegExp(pattern); } catch { return null; } })();
+  if (!regex) {
+    resultEl.textContent = '无效正则';
+    resultEl.className = 'regex-test-result error';
+    return;
+  }
+  const matched = regex.test(testUrl);
+  resultEl.textContent = matched ? '✓ 匹配' : '✗ 不匹配';
+  resultEl.className = `regex-test-result ${matched ? 'match' : 'no-match'}`;
+}
+
+function updateDomainWhitelistTest() {
+  if (!elements.domainWhitelistTestResult || !elements.responseCaptureDomainWhitelist) return;
+  const text = elements.responseCaptureDomainWhitelist.value;
+  const utils = window.AutoFormXCaptureUtils;
+  if (!utils) {
+    elements.domainWhitelistTestResult.textContent = '';
+    elements.domainWhitelistTestResult.className = 'regex-test-result';
+    return;
+  }
+  const patterns = utils.parsePatternLines(text);
+  if (patterns.length === 0) {
+    elements.domainWhitelistTestResult.textContent = '未配置规则';
+    elements.domainWhitelistTestResult.className = 'regex-test-result error';
+    return;
+  }
+  const invalid = patterns.filter((p) => !utils.compilePattern(p));
+  if (invalid.length) {
+    elements.domainWhitelistTestResult.textContent = `无效正则: ${invalid.join(', ')}`;
+    elements.domainWhitelistTestResult.className = 'regex-test-result error';
+    return;
+  }
+
+  const testHost = (elements.domainWhitelistTestInput?.value || '').trim();
+  if (testHost) {
+    const matched = utils.isDomainWhitelisted(testHost, text);
+    elements.domainWhitelistTestResult.textContent = matched ? '✓ 匹配' : '✗ 不匹配';
+    elements.domainWhitelistTestResult.className = `regex-test-result ${matched ? 'match' : 'no-match'}`;
+  } else {
+    elements.domainWhitelistTestResult.textContent = `${patterns.length} 条规则`;
+    elements.domainWhitelistTestResult.className = 'regex-test-result';
   }
 }
 

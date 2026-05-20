@@ -92,6 +92,64 @@ class AIClient {
     return this.extractBatchData(response, fields);
   }
 
+  /**
+   * 从 HTTP 响应体中提取结构化数据
+   */
+  async extractFromResponse({ url, body, extractPrompt, ruleName }) {
+    await this.init();
+
+    if (!this.config.apiKey) {
+      throw new Error('请先在设置中配置API Key');
+    }
+
+    const prompt = this.buildResponseExtractPrompt(url, body, extractPrompt, ruleName);
+    const response = await this.callAPI(prompt);
+    const content = this.extractData(response);
+    return this.parseExtractedJson(content);
+  }
+
+  buildResponseExtractPrompt(url, body, extractPrompt, ruleName) {
+    const truncated =
+      typeof body === 'string' && body.length > 32000 ? body.slice(0, 32000) + '\n...[truncated]' : body;
+
+    return `你是 API 响应数据提取器。请根据「提取要求」从下方 HTTP 响应体中提取字段。
+
+规则名称：${ruleName || '未命名'}
+请求 URL：${url}
+
+提取要求：
+${extractPrompt || '提取响应中有意义的业务字段，返回扁平 JSON 对象。'}
+
+输出要求：
+- 只返回一个 JSON 对象，不要解释、标题、Markdown 代码块或多余文字。
+- 不要输出思考过程。
+- key 使用英文字段名或中文业务名，value 为字符串或可 JSON 序列化的值。
+- 若无法提取，返回 {}。
+
+响应体：
+${truncated}`;
+  }
+
+  parseExtractedJson(content) {
+    let cleanContent = this.sanitizeModelContent(content)
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    try {
+      const parsed = JSON.parse(cleanContent);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (e) {
+      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+    }
+    throw new Error('无法解析 AI 提取结果');
+  }
+
   buildPrompt(fieldType, fieldLabel, context) {
     const typeDescriptions = {
       name: '中文姓名',
@@ -542,7 +600,6 @@ ${fieldList}${this.buildCustomPromptSection()}
         console.warn(`[AutoFormX] 未找到字段 ${fieldKey} 的生成数据`);
       });
 
-      console.log('[AutoFormX] 生成的数据映射:', result);
       return result;
     } catch (error) {
       console.error('[AutoFormX] 提取批量数据失败:', error);
@@ -558,8 +615,6 @@ const aiClient = new AIClient();
  * 监听来自content script的消息
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('[AutoFormX Background] 收到消息:', request);
-
   // 处理不同的action
   if (request.action === 'generateFieldData') {
     handleGenerateFieldData(request.data)
@@ -593,6 +648,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
     return true; // 保持消息通道开启
+  }
+
+  if (request.action === 'processCapturedResponse') {
+    handleProcessCapturedResponse(request.data)
+      .then((result) => {
+        sendResponse({ success: true, ...result });
+      })
+      .catch((error) => {
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
+  }
+
+  if (request.action === 'getExtractedResults') {
+    handleGetExtractedResults()
+      .then((data) => {
+        sendResponse({ success: true, data });
+      })
+      .catch((error) => {
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
+  }
+
+  if (request.action === 'clearExtractedResults') {
+    chrome.storage.local.set({ extractedResults: [] }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 
   // 处理获取模型列表请求
@@ -726,20 +810,150 @@ async function handleFetchModelList(data) {
   }
 }
 
+const MAX_EXTRACTED_RESULTS = 5;
+
+function flattenExtractedData(data, prefix = '') {
+  const items = [];
+  if (data === null || data === undefined) return items;
+
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    const label = prefix || 'value';
+    items.push({
+      key: label,
+      label,
+      value: Array.isArray(data) ? JSON.stringify(data) : String(data)
+    });
+    return items;
+  }
+
+  Object.keys(data).forEach((key) => {
+    const val = data[key];
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      items.push(...flattenExtractedData(val, path));
+    } else if (Array.isArray(val)) {
+      items.push({ key: path, label: path, value: JSON.stringify(val) });
+    } else {
+      items.push({
+        key: path,
+        label: path,
+        value: val === undefined || val === null ? '' : String(val)
+      });
+    }
+  });
+  return items;
+}
+
+async function loadCaptureRules() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get({ responseCaptureRules: [] }, (items) => {
+      resolve(items.responseCaptureRules || []);
+    });
+  });
+}
+
+async function handleProcessCapturedResponse(payload) {
+  const { url, body, ruleId } = payload;
+  const rules = await loadCaptureRules();
+  const rule = rules.find((r) => r.id === ruleId);
+
+  if (!rule || rule.enabled === false) {
+    return { notify: null };
+  }
+
+  if (!rule.extractPrompt || !rule.extractPrompt.trim()) {
+    console.warn('[AutoFormX][capture] 规则未配置提取 Prompt:', rule.name);
+    return { notify: null };
+  }
+
+  console.log(`[AutoFormX][capture] 开始 AI 提取: ${rule.name}`);
+  const extracted = await aiClient.extractFromResponse({
+    url,
+    body,
+    extractPrompt: rule.extractPrompt,
+    ruleName: rule.name
+  });
+
+  const itemRows = flattenExtractedData(extracted);
+  if (itemRows.length === 0) {
+    return { notify: null };
+  }
+
+  const entry = {
+    id: `ext_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    ruleId: rule.id,
+    ruleName: rule.name || '未命名规则',
+    url,
+    capturedAt: payload.capturedAt || Date.now(),
+    data: extracted,
+    items: itemRows
+  };
+
+  const stored = await new Promise((resolve) => {
+    chrome.storage.local.get({ extractedResults: [] }, (items) => {
+      resolve(items.extractedResults || []);
+    });
+  });
+
+  stored.unshift(entry);
+  if (stored.length > MAX_EXTRACTED_RESULTS) {
+    stored.length = MAX_EXTRACTED_RESULTS;
+  }
+
+  await new Promise((resolve) => {
+    chrome.storage.local.set({ extractedResults: stored }, resolve);
+  });
+
+  console.log('[AutoFormX][capture] 已保存提取结果:', entry.ruleName, itemRows.length, '项');
+  return { notify: { ruleName: entry.ruleName, count: itemRows.length } };
+}
+
+async function handleGetExtractedResults() {
+  const EXPIRE_MS = 15000;
+  const now = Date.now();
+
+  let stored = await new Promise((resolve) => {
+    chrome.storage.local.get({ extractedResults: [] }, (items) => {
+      resolve(items.extractedResults || []);
+    });
+  });
+
+  stored = stored.filter((entry) => now - (entry.capturedAt || 0) < EXPIRE_MS);
+
+  await new Promise((resolve) => {
+    chrome.storage.local.set({ extractedResults: stored }, resolve);
+  });
+
+  stored.sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0));
+
+  const flat = [];
+  stored.forEach((entry) => {
+    (entry.items || []).forEach((item) => {
+      flat.push({
+        ...item,
+        meta: {
+          entryId: entry.id,
+          ruleName: entry.ruleName,
+          url: entry.url,
+          capturedAt: entry.capturedAt
+        }
+      });
+    });
+  });
+  return flat;
+}
+
 /**
  * 处理生成单个字段数据的请求
  */
 async function handleGenerateFieldData(data) {
   const { fieldType, fieldLabel, fieldName, customPrompt } = data;
   
-  console.log(`[AutoFormX] 生成字段数据: ${fieldName} (${fieldType})`);
-  
   try {
     const generatedData = await aiClient.generateFieldData(fieldType, fieldLabel, {
       ...data,
       customPrompt
     });
-    console.log(`[AutoFormX] 生成成功:`, generatedData);
     return generatedData;
   } catch (error) {
     console.error('[AutoFormX] 生成失败:', error);
@@ -753,11 +967,8 @@ async function handleGenerateFieldData(data) {
 async function handleGenerateBatchData(data) {
   const { fields, customPrompt } = data;
   
-  console.log(`[AutoFormX] 批量生成 ${fields.length} 个字段的数据`);
-  
   try {
     const generatedData = await aiClient.generateBatchData(fields, customPrompt);
-    console.log(`[AutoFormX] 批量生成成功:`, generatedData);
     return generatedData;
   } catch (error) {
     console.error('[AutoFormX] 批量生成失败:', error);
@@ -799,9 +1010,20 @@ const DEFAULT_CONFIG = {
   customModels: {},
   temperature: 0.7,
   customPrompt: '',
-  showFieldButtons: true,
-  showGlobalButton: true,
-  globalButtonPosition: { bottom: '32px', right: '32px' }
+  showFieldButtons: false,
+  showGlobalButton: false,
+  globalButtonPosition: { bottom: '32px', right: '32px' },
+  responseCaptureEnabled: false,
+  responseCaptureDomainWhitelist: 'glaiveentit\\.i\\.wxblockchain\\.com',
+  responseCaptureRules: [
+    {
+      id: 'default_sms_code',
+      name: '提取短信验证码',
+      urlPattern: '.*/api/v1/gw/captcha/smart$',
+      extractPrompt: '提取接口响应中的短信验证码',
+      enabled: true
+    }
+  ]
 };
 
 /**
@@ -838,11 +1060,12 @@ function parseEnvContent(content) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
     
-    const [key, value] = trimmed.split('=').map(s => s.trim());
+    const [key, ...valueParts] = trimmed.split('=');
+    const value = valueParts.join('=').trim();
     if (!key || value === undefined) continue;
     
     // 根据键名设置对应配置
-    switch (key.toUpperCase()) {
+    switch (key.trim().toUpperCase()) {
       case 'PROVIDER':
         config.provider = value;
         break;
@@ -856,6 +1079,28 @@ function parseEnvContent(content) {
       case 'CUSTOM_MODEL':
         config.customModel = value;
         config.customModels.custom = value;
+        break;
+      case 'RESPONSE_CAPTURE_ENABLED':
+        config.responseCaptureEnabled = value.toLowerCase() === 'true';
+        break;
+      case 'RESPONSE_CAPTURE_DOMAIN_WHITELIST':
+        config.responseCaptureDomainWhitelist = value;
+        break;
+      case 'RESPONSE_CAPTURE_RULES':
+        try {
+          const rules = JSON.parse(value);
+          if (Array.isArray(rules)) {
+            config.responseCaptureRules = rules.map((r, i) => ({
+              id: r.id || `env_rule_${i}`,
+              name: r.name || `规则 ${i + 1}`,
+              urlPattern: r.urlPattern || '',
+              extractPrompt: r.extractPrompt || '',
+              enabled: r.enabled !== false
+            }));
+          }
+        } catch (e) {
+          console.warn('[AutoFormX] 解析 RESPONSE_CAPTURE_RULES 失败:', e.message);
+        }
         break;
     }
   }
